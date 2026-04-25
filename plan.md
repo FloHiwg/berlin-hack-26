@@ -1,69 +1,110 @@
-# Local Claims Intake Voice Agent Plan
+# Claims Intake Voice Agent — Plan
 
 ## Goal
 
-Build a fast local MVP for an insurance claims intake agent:
-
-- local microphone input
-- local speaker output
-- Gemini 3.1 Flash Live for native real-time audio (handles VAD + STT + LLM + TTS in one WebSocket session)
-- deterministic claim playbook enforced via function calling
-- sub-second perceived latency
-- upgrade path to Twilio inbound phone calls, then telli later if needed
+An insurance claims intake agent that collects structured claim data via voice,
+runs deterministically from a YAML playbook, and works across three transports:
+terminal (text), local mic/speaker (voice), and inbound phone calls (Twilio).
 
 ---
 
-## Architecture Overview
+## Architecture
 
 ```text
-mic → WebSocket → Gemini 3.1 Flash Live → speaker
-                          ↕
-              function calls → playbook engine → claim state
-
-Twilio call → Twilio Media Stream WebSocket → Gemini 3.1 Flash Live
-                                           ↕
-                             function calls → playbook engine → claim state
+mic / stdin / Twilio PSTN
+        ↓
+    audio bridge (app/phone/) or direct PCM (app/agent/)
+        ↓
+Gemini 3.1 Flash Live — VAD + STT + LLM + TTS, single WebSocket session
+        ↓  ↑  function calls
+  playbook engine (app/claims/playbook_engine.py)
+        ↓
+  claim state (app/claims/claim_state.py) — Pydantic, saved to JSON
 ```
 
-VAD, transcription, and voice synthesis are all handled inside the Live session. No separate libraries needed for any of those three stages.
+VAD, transcription, and voice synthesis are handled inside the Gemini Live session.
+No separate STT/TTS libraries needed.
 
 ---
 
-## MVP Acceptance Criteria
+## What Is Built
 
-A successful e2e demo completes one full claim intake via voice:
+### Session A — Text mode (complete)
+- `--text-mode` CLI: stdin input, Live API text session, stdout responses
+- Function calling: `update_claim_state`, `escalate`, `finalize_claim`
+- YAML playbook engine + system prompt builder
+- Claim state saved to `storage/sessions/<id>_claim.json`
 
-1. Agent greets caller and identifies customer (name + policy number)
-2. Agent classifies claim type and captures incident details
-3. Agent collects damage description and third-party involvement
-4. Agent handles at least one correction mid-flow without losing state
-5. Agent detects a risk flag and triggers escalation
-6. Session state is saved to JSON on disk at the end
+### Session B — Voice layer (complete)
+- `sounddevice` mic capture → 16kHz PCM → `send_realtime_input`
+- PCM playback at 24kHz from `receive()` audio chunks
+- Barge-in: clears audio queue on `interrupted` signal
 
-No audio hardware? Run with `--text-mode` flag via stdin/stdout — same playbook and function-calling logic, no mic/speaker required.
+### Session D — Twilio phone transport (complete)
+- `app/phone/server.py` — FastAPI with `POST /twilio/voice` (TwiML) and `WS /twilio/media`
+- `app/phone/bridge.py` — bridges Twilio Media Streams ↔ Gemini Live session
+- `app/phone/audio.py` — G.711 μ-law codec (numpy, Python 3.13-safe), 8kHz↔16kHz/24kHz resampling
+- `--twilio-setup` registers the voice webhook via Twilio REST API
+- `--twilio-server --port 8080` starts the FastAPI server
+
+### Phase 3 — Playbook depth (complete)
+- Identity OR logic: policy number alone, OR full name + date of birth
+- `verify_caller` stage: checks whether caller is the policyholder; collects caller name + relationship if not
+- Conditional stages via `skip_if` in playbook YAML: `verify_caller`, `third_party_details`, `witness`, `police_details`, `rental_preference`, `repair_preference`
+- Expanded `FIELD_EXPECTATIONS` and identity rules injected into system prompt
+- Eval runner: `--eval-transcript <file.yaml> --eval-assert` replays a YAML transcript and asserts final claim state
+- Three eval scenarios: `evals/happy_path.yaml`, `evals/third_party_caller.yaml`, `evals/escalation.yaml`
 
 ---
 
-## Prerequisites & Setup
+## Playbook Stages
 
-### Python version
-
-Python 3.11+
-
-### Dependencies
-
-```text
-google-genai            # Gemini Live API (includes live WebSocket client)
-sounddevice             # mic input + speaker output
-numpy                   # PCM buffer handling
-pydantic                # claim state schemas
-pyyaml                  # playbook definition
-python-dotenv           # .env loading
-twilio                  # TwiML helpers, REST client for webhook setup
-fastapi/uvicorn         # webhook + Media Streams WebSocket endpoint
+```
+identify_customer → verify_caller* → classify_claim → collect_incident
+    → third_party_details* → witness* → police_details* → collect_damage
+    → settlement → rental_preference* → repair_preference* → collect_documents
+    → finalize
 ```
 
-### Credentials
+`*` = conditional stage with `skip_if`
+
+---
+
+## How Agent Instructions Work
+
+| Layer | File | Purpose |
+|---|---|---|
+| Playbook YAML | `app/claims/playbook.yaml` | Stage order and required fields per stage |
+| Field expectations | `app/agent/prompts.py` `FIELD_EXPECTATIONS` | Per-field filling rules given to the model |
+| System prompt rules | `app/agent/prompts.py` `build_system_prompt()` | Behavioral rules, identity OR logic, escalation |
+
+---
+
+## Run Commands
+
+```bash
+# Text mode (no audio hardware needed)
+uv run python app/main.py --text-mode
+
+# Voice mode (mic + speaker)
+uv run python app/main.py
+
+# Phone mode (Twilio)
+ngrok http 8080                                          # start tunnel
+uv run python app/main.py --twilio-setup                 # register webhook (once per tunnel URL)
+uv run python app/main.py --twilio-server --port 8080    # start server
+
+# Eval runner
+uv run python app/main.py --text-mode --eval-transcript evals/happy_path.yaml --eval-assert
+uv run python app/main.py --text-mode --eval-transcript evals/third_party_caller.yaml --eval-assert
+uv run python app/main.py --text-mode --eval-transcript evals/escalation.yaml --eval-assert
+```
+
+Always use `uv run python` — the conda base env is active and would shadow the project venv.
+
+---
+
+## Credentials (`.env`)
 
 ```env
 GEMINI_API_KEY=...
@@ -74,508 +115,23 @@ TWILIO_NUMBER=...
 TWILIO_PUBLIC_URL=https://your-tunnel.ngrok-free.app
 ```
 
-No Google Cloud service account needed for the MVP — the Gemini API key covers the Live API.
-Twilio uses API key auth for REST calls. `TWILIO_PUBLIC_URL` is the public tunnel URL (e.g. ngrok)
-used both by `--twilio-setup` to register the webhook and by the TwiML response to construct the
-WebSocket URL.
+---
 
-### Run
+## Stack
 
-```bash
-uv run python app/main.py                       # full voice loop (mic/speaker)
-uv run python app/main.py --text-mode           # CLI stdin/stdout, no audio hardware
-uv run python app/main.py --twilio-setup        # register webhook with Twilio (run once per tunnel URL)
-uv run python app/main.py --twilio-server       # start FastAPI server for inbound phone calls
-uv run python app/main.py --twilio-server --port 8080
-```
-
-Always use `uv run python` rather than bare `python` — the conda base environment is active and
-would shadow the project venv otherwise.
+| Component | Choice |
+|---|---|
+| Model | `gemini-3.1-flash-live-preview` |
+| Audio I/O (local) | `sounddevice` |
+| Audio I/O (phone) | Twilio Media Streams + numpy G.711 codec |
+| Phone transport | Twilio Programmable Voice |
+| Server | FastAPI + Uvicorn |
+| State schema | Pydantic |
+| Playbook | YAML |
+| Config | `python-dotenv` |
 
 ---
 
-## Recommended Stack
+## What Is Left
 
-| Component | Choice | Notes |
-|---|---|---|
-| Language | Python 3.11+ | |
-| Real-time audio model | `gemini-3.1-flash-live-preview` | VAD + STT + LLM + TTS in one session |
-| Audio I/O | `sounddevice` | PCM capture and playback |
-| Audio format (in) | 16-bit PCM, 16 kHz, little-endian | required by Live API |
-| Audio format (out) | 16-bit PCM, 24 kHz, little-endian | returned by Live API |
-| Voice | `Kore` (or `Charon`, `Fenrir`, `Aoede`) | configured in session |
-| Playbook | YAML + function calling tools | model calls tools to update state |
-| State | local JSON | Pydantic schema |
-| Config | `python-dotenv` + `.env` | |
-| Phone transport | Twilio Programmable Voice + Media Streams | bridges PSTN audio to Gemini Live |
-
----
-
-## Phase 1: Session Architecture
-
-Gemini 3.1 Flash Live uses a persistent WebSocket session per call. Audio streams in both directions concurrently. The model handles its own turn detection (built-in VAD) and speaks back directly.
-
-```text
-┌─────────────────────────────────────────────────────┐
-│  Live Session (WSS, stateful, up to 15 min)         │
-│                                                     │
-│  mic PCM (16kHz) ──→ send_realtime_input()          │
-│                            ↓                        │
-│                   Gemini 3.1 Flash Live             │
-│                     - VAD (built-in)                │
-│                     - speech understanding          │
-│                     - reasoning + playbook          │
-│                     - function calling              │
-│                     - voice synthesis               │
-│                            ↓                        │
-│  speaker (24kHz) ←── receive() audio chunks        │
-│                            ↓                        │
-│  claim state  ←── function call payloads           │
-└─────────────────────────────────────────────────────┘
-```
-
-### Interruption (barge-in)
-
-Built into the Live API. When the user speaks while the model is talking, `response.server_content.interrupted == True` — stop playback and clear the audio queue. No custom logic needed.
-
-### VAD
-
-Configured in session setup, not in application code:
-
-```python
-"realtime_input_config": {
-    "automatic_activity_detection": {
-        "start_of_speech_sensitivity": StartSensitivity.START_SENSITIVITY_LOW,
-        "end_of_speech_sensitivity": EndSensitivity.END_SENSITIVITY_LOW,
-        "silence_duration_ms": 500,
-    }
-}
-```
-
----
-
-## Phase 2: Performance Targets
-
-```text
-End-of-speech detection (built-in VAD):   300-500ms
-Model first audio chunk:                  400-800ms
-Total perceived delay:                    < 1.5s
-```
-
-No filler audio needed — the session is always warm and the model starts streaming audio within ~400–800ms of end-of-speech detection.
-
----
-
-## Phase 3: Claim State
-
-Keep a structured Pydantic object from the start.
-
-```json
-{
-  "claim_type": null,
-  "customer": {
-    "full_name": null,
-    "policy_number": null,
-    "date_of_birth": null
-  },
-  "incident": {
-    "date": null,
-    "time": null,
-    "location": null,
-    "description": null
-  },
-  "damage": {
-    "items": [],
-    "estimated_value": null,
-    "photos_available": null
-  },
-  "third_parties": {
-    "involved": null,
-    "details": null
-  },
-  "safety": {
-    "injuries": null,
-    "police_report": null,
-    "urgent_risk": null
-  },
-  "documents": {
-    "photos": null,
-    "receipts": null,
-    "police_report": null
-  },
-  "handoff_required": false,
-  "risk_flags": []
-}
-```
-
----
-
-## Phase 4: Playbook Design
-
-The playbook YAML defines required fields per state. The playbook engine determines what's missing and what to ask next. This is **injected into the system prompt** at session start and updated via tool call responses.
-
-```yaml
-states:
-  identify_customer:
-    required:
-      - customer.full_name
-      - customer.policy_number
-    next: classify_claim
-
-  classify_claim:
-    required:
-      - claim_type
-      - incident.date
-      - incident.location
-    next: collect_incident
-
-  collect_incident:
-    required:
-      - incident.description
-      - damage.items
-      - third_parties.involved
-      - safety.injuries
-    next: collect_documents
-
-  collect_documents:
-    required:
-      - documents.photos
-      - documents.receipts
-    next: finalize
-
-  finalize:
-    required:
-      - customer.preferred_contact_method
-    next: done
-
-  escalate:
-    trigger: handoff_required == true OR urgent_risk == true
-    action: notify_human_agent
-    next: done
-```
-
----
-
-## Phase 5: Function Calling Tools
-
-Instead of a structured JSON response schema, the model calls Python functions to update state. The Live API invokes these synchronously (sequential tool use only — async/NON_BLOCKING not supported in 3.1 Flash Live).
-
-### Tool: `update_claim_state`
-
-```python
-def update_claim_state(claim_update: dict) -> dict:
-    """Called by the model after extracting information from the user."""
-    state.merge(claim_update)
-    missing = playbook_engine.get_missing_fields(state)
-    return {
-        "status": "updated",
-        "missing_fields": missing,
-        "current_playbook_state": playbook_engine.current_state(state),
-    }
-```
-
-### Tool: `escalate`
-
-```python
-def escalate(reason: str, risk_flags: list[str]) -> dict:
-    """Called when the model detects urgent risk or handoff is needed."""
-    state.handoff_required = True
-    state.risk_flags.extend(risk_flags)
-    save_session(state)
-    notify_human_agent(state, reason)
-    return {"status": "escalated", "reason": reason}
-```
-
-### Tool: `finalize_claim`
-
-```python
-def finalize_claim() -> dict:
-    """Called when all required fields are collected."""
-    save_session(state)
-    return {"status": "done", "session_id": state.session_id}
-```
-
-The model decides when to call these based on the conversation. The system prompt instructs it to call `update_claim_state` after every user answer.
-
----
-
-## Phase 6: System Prompt Strategy
-
-The system prompt is built at session start and includes:
-
-1. Agent role and tone instructions
-2. Current playbook state and required fields
-3. Current claim state (only filled fields, to stay under context limits)
-4. Explicit instruction to call `update_claim_state` after each answer
-5. Escalation triggers
-
-```python
-def build_system_prompt(playbook_state: str, claim_state: dict) -> str:
-    missing = playbook_engine.get_missing_fields(claim_state)
-    filled = {k: v for k, v in flatten(claim_state).items() if v is not None}
-    return f"""
-You are a professional insurance claims intake agent. You are calm, clear, and efficient.
-
-Current stage: {playbook_state}
-Fields still needed: {missing}
-Already collected: {filled}
-
-After each user answer, call update_claim_state with the extracted fields.
-If the user reports injuries, urgent risk, or requests human help, call escalate immediately.
-When all required fields are collected, call finalize_claim.
-Ask only one question at a time. Confirm corrections naturally without repeating back every field.
-"""
-```
-
-Do not rebuild the session mid-call to update the prompt. Use tool call return values to pass updated state back to the model.
-
----
-
-## Phase 7: Conversation Loop
-
-Full async pattern using `google-genai` Live client:
-
-```python
-import asyncio
-import sounddevice as sd
-import numpy as np
-from google import genai
-from google.genai import types
-from dotenv import load_dotenv
-
-load_dotenv()
-client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-
-SAMPLE_RATE_IN  = 16000
-SAMPLE_RATE_OUT = 24000
-CHUNK_FRAMES    = 1024
-
-async def send_audio(session):
-    loop = asyncio.get_event_loop()
-    queue = asyncio.Queue()
-
-    def callback(indata, frames, time, status):
-        loop.call_soon_threadsafe(queue.put_nowait, bytes(indata))
-
-    with sd.RawInputStream(samplerate=SAMPLE_RATE_IN, channels=1,
-                           dtype="int16", blocksize=CHUNK_FRAMES,
-                           callback=callback):
-        while True:
-            chunk = await queue.get()
-            await session.send_realtime_input(
-                audio=types.Blob(data=chunk, mime_type="audio/pcm;rate=16000")
-            )
-
-async def receive_audio(session):
-    stream = sd.RawOutputStream(samplerate=SAMPLE_RATE_OUT, channels=1, dtype="int16")
-    stream.start()
-    async for response in session.receive():
-        if response.server_content:
-            if response.server_content.interrupted:
-                stream.stop()
-                stream.start()
-                continue
-            for part in response.server_content.model_turn.parts:
-                if part.inline_data:
-                    stream.write(np.frombuffer(part.inline_data.data, dtype="int16"))
-        elif response.tool_call:
-            await handle_tool_call(session, response.tool_call)
-
-async def handle_tool_call(session, tool_call):
-    results = []
-    for call in tool_call.function_calls:
-        if call.name == "update_claim_state":
-            result = update_claim_state(**call.args)
-        elif call.name == "escalate":
-            result = escalate(**call.args)
-        elif call.name == "finalize_claim":
-            result = finalize_claim(**call.args)
-        else:
-            result = {"error": "unknown tool"}
-        results.append(types.FunctionResponse(name=call.name, response=result, id=call.id))
-    await session.send_tool_response(function_responses=results)
-
-async def run_session():
-    config = types.LiveConnectConfig(
-        response_modalities=["AUDIO"],
-        system_instruction=build_system_prompt(playbook_engine.initial_state, claim_state),
-        tools=[update_claim_state_tool, escalate_tool, finalize_claim_tool],
-        speech_config=types.SpeechConfig(
-            voice_config=types.VoiceConfig(
-                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Kore")
-            )
-        ),
-        realtime_input_config=types.RealtimeInputConfig(
-            automatic_activity_detection=types.AutomaticActivityDetection(
-                silence_duration_ms=500,
-            )
-        ),
-    )
-    async with client.aio.live.connect(
-        model="gemini-3.1-flash-live-preview", config=config
-    ) as session:
-        await asyncio.gather(send_audio(session), receive_audio(session))
-
-asyncio.run(run_session())
-```
-
-### Text mode
-
-Replace `send_audio` with an `async` stdin reader and `receive_audio` with a text printer. Add `response_modalities=["TEXT"]` in the session config. Same tool handling, same playbook engine.
-
----
-
-## Phase 8: Session Limits & Reconnection
-
-- Audio-only sessions: **15 minute maximum**
-- On timeout or disconnect: save current claim state to JSON, reconnect, inject saved state into new session prompt
-- Log `session_id` and elapsed time per turn for visibility
-
-```python
-async def run_with_reconnect():
-    while claim_state.status != "done":
-        try:
-            await run_session()
-        except LiveSessionExpiredError:
-            log("session expired, reconnecting with saved state")
-            # run_session() will rebuild system prompt from current claim_state
-```
-
----
-
-## Phase 9: Latency Logging
-
-Log per-turn timing from the first audio chunk sent to the first audio chunk received:
-
-```python
-{
-  "turn": 3,
-  "first_audio_sent_ms": 0,
-  "first_audio_received_ms": 620,
-  "tool_call_round_trip_ms": 45,
-  "interrupted": false
-}
-```
-
-Write to `storage/sessions/<session_id>_latency.jsonl`.
-
----
-
-## Phase 10: Upgrade Path to telli
-
-Replace `sounddevice` with telli WebSocket call events and telli audio streaming. The session management, playbook engine, function call handlers, and claim state stay unchanged. Pass `response_modalities=["AUDIO", "TEXT"]` and forward the text to telli instead of playing PCM locally.
-
----
-
-## Phase 11: Twilio Phone Integration
-
-Twilio becomes the first real phone transport. Keep the Gemini session, claim state, playbook engine, tools, and prompt builder unchanged; only replace local microphone/speaker I/O with a Twilio Media Streams bridge.
-
-```text
-caller phone
-   ↕ PSTN
-Twilio Programmable Voice
-   ↕ Media Streams WebSocket (8kHz μ-law frames)
-app/phone/bridge.py
-   ↕ decode μ-law + resample to 16kHz PCM (via app/phone/audio.py)
-Gemini Live session
-   ↕ 24kHz PCM response audio
-app/phone/bridge.py
-   ↕ resample to 8kHz + encode μ-law (via app/phone/audio.py)
-Twilio Programmable Voice
-   ↕
-caller phone
-```
-
-### Twilio endpoints (`app/phone/server.py`)
-
-- `POST /twilio/voice` — returns TwiML that connects the inbound call to the Media Streams WebSocket
-- `WS /twilio/media` — receives `connected`, `start`, `media`, and `stop` events; runs the bridge
-- `POST /twilio/status` — logs call lifecycle events (callSid, status) for debugging
-
-### Webhook registration (`--twilio-setup`)
-
-`app/main.py --twilio-setup` reads `TWILIO_NUMBER` and `TWILIO_PUBLIC_URL` from `.env` and calls
-the Twilio REST API to set the number's `voice_url` and `status_callback`. Re-run whenever the
-tunnel URL changes.
-
-### Audio bridge (`app/phone/bridge.py` + `app/phone/audio.py`)
-
-- Decode incoming Twilio `media.payload` (base64 μ-law 8kHz) → 16-bit PCM via numpy G.711 codec
-- Upsample 8kHz → 16kHz via linear interpolation → `send_realtime_input()`
-- Receive Gemini 24kHz PCM → decimate to 8kHz → encode μ-law → send Twilio `media` event
-- On Gemini barge-in (`interrupted`), drain audio queue and send Twilio `clear` event
-- `speaking_event` suppresses caller audio while the agent is speaking (mirrors local barge-in mute)
-- `callSid` and `streamSid` captured from the `start` event and persisted in session log
-
-### Local development
-
-1. Start a tunnel: `ngrok http 8080`
-2. Set `TWILIO_PUBLIC_URL` in `.env` to the ngrok HTTPS URL
-3. Register webhook: `uv run python app/main.py --twilio-setup`
-4. Start server: `uv run python app/main.py --twilio-server --port 8080`
-5. Call your Twilio number — the intake agent answers immediately
-
----
-
-## Recommended Build Order
-
-### Session A — Text loop works end-to-end (hours 1–2)
-
-1. `--text-mode` CLI: stdin input, Live API text session, print responses
-2. Wire function calling: `update_claim_state`, `escalate`, `finalize_claim`
-3. Add YAML playbook engine and system prompt builder
-
-**Checkpoint:** complete claim intake from terminal with structured state saved to JSON.
-
-### Session B — Voice layer wired in (hours 2–4)
-
-4. Add `sounddevice` mic capture → PCM chunks → `send_realtime_input`
-5. Add PCM playback from `receive()` audio chunks
-6. Configure VAD sensitivity and barge-in handling
-
-**Checkpoint:** full voice loop works end-to-end with a real mic/speaker. No separate STT or TTS service needed.
-
-### Session C — Polish & resilience (hours 4–5)
-
-7. Add session reconnection on timeout (15-min limit)
-8. Add latency logging per turn
-9. Add eval conversations in YAML + a replay runner in `--text-mode`
-
-**Checkpoint:** local voice demo is resilient enough to run repeatedly.
-
-### Session D — Twilio phone transport (Completed)
-
-The Twilio phone transport has been successfully implemented in the `app/phone` module:
-1. `app/phone/server.py` — FastAPI app with `POST /twilio/voice` (TwiML) and `POST /twilio/status`
-2. `app/phone/bridge.py` — the WebSocket bridge interfacing Twilio with `GeminiSession`
-3. `app/phone/audio.py` — utility functions to decode μ-law 8kHz → PCM 16kHz → Gemini, and back
-
-The existing `run_twilio_bridge` function successfully feeds the `GeminiSession` entry points without requiring changes to the core `app/agent/session.py`.
-
-**Checkpoint:** complete claim intake over a real phone call.
-
-### Session E — Playbook depth (after Twilio works end-to-end)
-
-Once you have real phone calls you'll immediately feel where the playbook is shallow. The natural next areas:
-- Richer stages: witness info, police report follow-up, rental car preference, repair shop selection
-- Smarter `FIELD_EXPECTATIONS` — right now it's just descriptions; you could add validation hints or required sub-fields
-- A replay runner in `--text-mode` so you can iterate on the playbook YAML without making real calls
-
-**Checkpoint:** Deepened playbook flows with automated testing.
-
----
-
-## Best Initial Stack
-
-```text
-Python 3.13+
-google-genai (Live API)          — gemini-3.1-flash-live-preview
-sounddevice                      — mic capture + speaker playback (PCM, local mode only)
-numpy                            — G.711 μ-law codec + PCM resampling (phone mode)
-Pydantic                         — claim state schema + tool payloads
-PyYAML                           — playbook definition
-python-dotenv                    — .env / API key loading
-twilio                           — TwiML response builder + REST client for webhook setup
-FastAPI + Uvicorn                — inbound call webhook and Media Streams WebSocket bridge
-```
+See `TODO.md`.
