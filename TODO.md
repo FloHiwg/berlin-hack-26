@@ -1,30 +1,22 @@
-# TODO
-
-## Reliability
-
-- [ ] Session reconnection: save claim state and re-attach when Gemini hits the 15-min session limit
+Necessary
+- [ ] Tool Calling
+- [ ] Record conversations: save full transcript (both sides) to `storage/sessions/<id>_transcript.txt` for every session
+- [ ] Latency logging: log time from end-of-speech to first agent audio chunk per turn to `storage/sessions/<id>_latency.
+- [ ] Switch to handle everything as a car accident by default
+- [ ] Connect UI as WEB ui with live transcripts and visib ility of the state and stages etc 
+- [ ] Add date and time to the system prompt
+- [ ] Session reconnection: save claim state and re-attach when Gemini hits the 15-min session limit or just runs into an error
 - [ ] Retry / graceful shutdown on Twilio WebSocket disconnect mid-call
 
-## Observability
+Nice to have
+- [ ] Add functionality that someone who already called within the last 10 mins with the same number can continue his last conversation with a natural pick like "did we lost our connection? No worries lets continue"
+- [ ] Add background audio to simulate office background noice
+- [ ] Add a jingle in the beginning with the question to press 1 if you have an emergency
+- [ ] Add handling of session cancellations
 
-- [ ] Record conversations: save full transcript (both sides) to `storage/sessions/<id>_transcript.txt` for every session
-- [ ] Latency logging: log time from end-of-speech to first agent audio chunk per turn to `storage/sessions/<id>_latency.jsonl`
+- [ ] Connect to insurance database 
 
-## Eval
-
-- [ ] Run all three eval scenarios and make them pass reliably
-  - `evals/happy_path.yaml`
-  - `evals/third_party_caller.yaml`
-  - `evals/escalation.yaml`
-- [ ] Add eval scenario: caller corrects a field mid-flow (e.g., wrong date)
-- [ ] Add eval scenario: caller identifies by name + DOB (not policy number)
-
-## Playbook
-
-- [ ] Tune `FIELD_EXPECTATIONS` based on real call transcripts once recording is in place
-- [ ] Add `handoff_required` assertion to escalation eval (field exists in ClaimState but is not yet set by the `escalate` tool call reliably)
-
-## Phone
-
-- [ ] End-to-end phone test: call Twilio number, complete full intake, verify saved JSON
-- [ ] `POST /twilio/status` — forward call lifecycle events to a log file, not just stdout
+Furthermore
+- Remove Twilio phone connection from open points from the plan since it is already done 
+- What do you mean by onversation Loop and google live 
+- Remove Session Limits & Reconnection as an aspects
