@@ -15,7 +15,9 @@ Nice to have
 - [ ] Add a jingle in the beginning with the question to press 1 if you have an emergency
 - [ ] Add handling of session cancellations
 
-- [ ] Connect to insurance database 
+- [ ] Connect to insurance database
+ 
+- [ ] 
 
 Furthermore
 - Remove Twilio phone connection from open points from the plan since it is already done 
