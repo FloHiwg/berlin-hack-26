@@ -60,14 +60,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-async def async_main() -> None:
-    load_dotenv(ROOT / ".env")
-    args = parse_args()
-
-    if args.twilio_server:
-        _run_twilio_server(args.port)
-        return
-
+async def async_main(args: argparse.Namespace) -> None:
     try:
         await run_session(
             text_mode=args.text_mode,
@@ -92,7 +85,12 @@ def _run_twilio_server(port: int) -> None:
 
 
 def main() -> None:
-    asyncio.run(async_main())
+    load_dotenv(ROOT / ".env")
+    args = parse_args()
+    if args.twilio_server:
+        _run_twilio_server(args.port)
+        return
+    asyncio.run(async_main(args))
 
 
 if __name__ == "__main__":
