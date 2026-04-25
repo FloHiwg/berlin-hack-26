@@ -339,6 +339,7 @@ def _build_audio_config(
     playbook_engine: PlaybookEngine,
     claim_state: ClaimState,
     transcription_enabled: bool = False,
+    caller_phone: str | None = None,
 ) -> types.LiveConnectConfig:
     voice_name = os.getenv("GEMINI_VOICE", "Kore")
     silence_ms = int(os.getenv("VAD_SILENCE_MS", "800"))
@@ -353,7 +354,7 @@ def _build_audio_config(
 
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
-        system_instruction=build_system_prompt(playbook_engine, claim_state, voice_mode=True),
+        system_instruction=build_system_prompt(playbook_engine, claim_state, voice_mode=True, caller_phone=caller_phone),
         tools=tools,
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
