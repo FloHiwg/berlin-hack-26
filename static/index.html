@@ -3,593 +3,746 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>inca — Session Conversations</title>
+    <title>Session Conversations</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <style>
-        /* Inca Design System Tokens */
+        /* ── Design System: Modern Organic Minimalist ─────────────────── */
         :root {
-            /* Olive / forest */
-            --ink-900: #1F2410;
-            --ink-800: #2E331C;
-            --ink-700: #3D4128;
-            --ink-600: #4A4D2E;
-            --ink-500: #6B6E4A;
-            --ink-400: #8E906C;
-            --ink-300: #B5B698;
-            --ink-200: #D8D8C4;
-            --ink-100: #E9E7D6;
-            --ink-50:  #F1ECE0;
+            --surface:                   #faf9f5;
+            --surface-dim:               #dbdad6;
+            --surface-container-lowest:  #ffffff;
+            --surface-container-low:     #f5f4f0;
+            --surface-container:         #efeeea;
+            --surface-container-high:    #e9e8e4;
+            --surface-container-highest: #e3e2df;
+            --on-surface:                #1b1c1a;
+            --on-surface-variant:        #454835;
+            --inverse-surface:           #30312e;
+            --inverse-on-surface:        #f2f1ed;
+            --outline:                   #767963;
+            --outline-variant:           #c6c9b0;
 
-            /* Cream */
-            --paper:   #F1ECE0;
-            --paper-2: #E7E0CE;
-            --paper-3: #D9CFB6;
-            --bone:    #F8F4E9;
-            --char:    #1F2410;
+            --primary:                   #556500;
+            --on-primary:                #ffffff;
+            --primary-container:         #9ab50a;
+            --on-primary-container:      #384300;
+            --inverse-primary:           #b6d332;
+            --primary-fixed:             #d2f04e;
+            --primary-fixed-dim:         #b6d332;
+            --on-primary-fixed:          #181e00;
+            --on-primary-fixed-variant:  #3f4c00;
 
-            /* Mustard accent */
-            --mars-700: #6E6420;
-            --mars-600: #8C7E2A;
-            --mars-500: #A89C3D;
-            --mars-400: #BFB55C;
-            --mars-200: #DDD79A;
-            --mars-100: #ECE8C7;
+            --secondary:                 #5b623a;
+            --on-secondary:              #ffffff;
+            --secondary-container:       #dde4b2;
+            --on-secondary-container:    #5f663e;
 
-            /* Signal */
-            --ok:   oklch(58% 0.12 140);
-            --warn: oklch(70% 0.13 70);
-            --crit: oklch(55% 0.16 30);
-            --info: oklch(55% 0.08 220);
+            --error:                     #ba1a1a;
+            --error-container:           #ffdad6;
+            --on-error-container:        #93000a;
 
-            /* Typography */
-            --font-display: "Cormorant Garamond", "EB Garamond", serif;
-            --font-body:    "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+            --font-body:    "Manrope", "Helvetica Neue", Arial, sans-serif;
             --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", monospace;
 
-            /* Radii */
-            --r-sm: 4px;
-            --r-md: 6px;
-            --r-lg: 8px;
-            --r-xl: 12px;
-            --r-pill: 999px;
+            --r-sm:   0.25rem;
+            --r-md:   0.5rem;
+            --r-lg:   0.75rem;
+            --r-xl:   1rem;
+            --r-2xl:  1.5rem;
+            --r-pill: 9999px;
 
-            /* Shadow */
-            --shadow-1: 0 1px 0 rgba(10,22,40,0.04), 0 1px 2px rgba(10,22,40,0.06);
-            --shadow-2: 0 1px 0 rgba(10,22,40,0.04), 0 6px 16px -6px rgba(10,22,40,0.12);
-
-            /* Spacing */
-            --s-2: 8px;
-            --s-3: 12px;
-            --s-4: 16px;
-            --s-5: 20px;
-            --s-6: 24px;
-            --s-7: 32px;
+            --sp-1: 4px;
+            --sp-2: 8px;
+            --sp-3: 12px;
+            --sp-4: 24px;
+            --sp-5: 32px;
+            --sp-6: 48px;
+            --sp-7: 80px;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: var(--font-body);
-            background: var(--ink-700);
-            color: var(--paper);
+            background: var(--surface);
+            color: var(--on-surface);
             min-height: 100vh;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: var(--s-7);
+            padding: var(--sp-5);
         }
 
+        /* ── Header ── */
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: var(--s-6);
+            margin-bottom: var(--sp-4);
+            padding-bottom: var(--sp-4);
+            border-bottom: 1px solid var(--outline-variant);
         }
 
         .header-nav {
             display: flex;
             align-items: center;
-            gap: var(--s-4);
+            gap: var(--sp-3);
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 48px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+            color: var(--on-surface);
         }
 
         .back-btn {
             display: none;
             align-items: center;
-            gap: var(--s-2);
-            padding: 8px 14px;
+            gap: var(--sp-2);
+            padding: 8px 18px;
             background: transparent;
-            border: 1px solid var(--ink-600);
-            border-radius: var(--r-sm);
-            color: var(--ink-300);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-pill);
+            color: var(--on-surface-variant);
             font-family: var(--font-body);
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
+            letter-spacing: 0.04em;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: border-color 0.15s, color 0.15s;
         }
 
-        .back-btn.visible {
-            display: inline-flex;
-        }
+        .back-btn.visible { display: inline-flex; }
+        .back-btn:hover { border-color: var(--outline); color: var(--on-surface); }
 
-        .back-btn:hover {
-            background: var(--ink-600);
-            color: var(--paper);
-        }
-
-        h1 {
-            font-family: var(--font-display);
-            font-style: italic;
-            font-size: 48px;
-            font-weight: 400;
-            color: var(--mars-400);
-            letter-spacing: -0.01em;
-            line-height: 1.1;
-            margin: 0;
-        }
-
+        /* ── Filters ── */
         .filters {
-            background: var(--ink-800);
-            border: 1px solid var(--ink-600);
-            border-radius: var(--r-lg);
-            padding: var(--s-4);
-            margin-bottom: var(--s-5);
+            background: var(--surface-container-low);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            padding: 12px var(--sp-4);
+            margin-bottom: var(--sp-4);
             display: flex;
-            gap: var(--s-3);
+            gap: var(--sp-3);
             align-items: center;
         }
 
         .filter-label {
-            font-family: var(--font-mono);
-            font-size: 10px;
-            letter-spacing: 0.12em;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            color: var(--ink-400);
+            color: var(--outline);
             flex-shrink: 0;
         }
 
         .filter-input {
             flex: 1;
             max-width: 400px;
-            padding: 9px 14px;
-            background: var(--ink-700);
-            border: 1px solid var(--ink-600);
-            border-radius: var(--r-sm);
-            color: var(--paper);
+            padding: 8px 14px;
+            background: var(--surface-container-lowest);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-md);
+            color: var(--on-surface);
             font-family: var(--font-body);
             font-size: 14px;
         }
 
-        .filter-input::placeholder {
-            color: var(--ink-400);
-        }
-
-        .filter-input:focus {
-            outline: none;
-            border-color: var(--mars-500);
-            background: var(--ink-600);
-        }
+        .filter-input::placeholder { color: var(--outline); }
+        .filter-input:focus { outline: none; border-color: var(--primary); }
 
         .filter-stats {
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--ink-400);
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--outline);
             margin-left: auto;
         }
 
-        .sessions-list {
-            display: grid;
-            gap: var(--s-4);
-        }
+        /* ── Session list ── */
+        .sessions-list { display: grid; gap: var(--sp-3); }
+        .sessions-list.hidden { display: none; }
+        .session-detail-view { display: none; }
+        .session-detail-view.active { display: block; }
 
-        .sessions-list.hidden {
-            display: none;
-        }
-
-        .session-detail-view {
-            display: none;
-        }
-
-        .session-detail-view.active {
-            display: block;
-        }
-
+        /* ── Session card ── */
         .session-card {
-            background: var(--bone);
-            border: 1px solid var(--ink-200);
-            border-radius: var(--r-lg);
-            padding: var(--s-5);
-            box-shadow: var(--shadow-1);
+            background: var(--surface-container-lowest);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            padding: var(--sp-4);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: border-color 0.15s;
         }
 
-        .session-card:hover {
-            box-shadow: var(--shadow-2);
-            border-color: var(--ink-300);
-        }
+        .session-card:hover { border-color: var(--outline); }
 
         .session-header {
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: var(--s-3);
+            margin-bottom: var(--sp-3);
         }
 
         .session-id {
             font-family: var(--font-mono);
             font-size: 11px;
             letter-spacing: 0.08em;
-            color: var(--ink-500);
+            color: var(--outline);
             text-transform: uppercase;
         }
 
         .session-date {
             font-size: 13px;
-            color: var(--ink-600);
+            font-weight: 400;
+            color: var(--on-surface-variant);
+            margin-top: 4px;
         }
 
         .session-stage {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: var(--r-pill);
-            font-family: var(--font-mono);
-            font-size: 10.5px;
-            font-weight: 500;
-            letter-spacing: 0.08em;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
             text-transform: uppercase;
-            background: var(--mars-100);
-            color: var(--mars-700);
+            background: var(--secondary-container);
+            color: var(--on-secondary-container);
         }
 
         .session-stage::before {
             content: "";
-            width: 6px;
-            height: 6px;
+            width: 6px; height: 6px;
             border-radius: var(--r-pill);
-            background: var(--mars-500);
+            background: var(--secondary);
         }
 
-        .conversation {
-            margin-top: var(--s-4);
-            padding-top: var(--s-4);
-            border-top: 1px solid var(--ink-200);
-            display: none;
-            position: relative;
-        }
-
-        .conversation.active {
-            display: block;
-        }
-
-        .conversation-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--s-4);
-        }
-
-        .conversation-title {
-            font-family: var(--font-mono);
-            font-size: 10.5px;
-            font-weight: 500;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: var(--ink-500);
-        }
-
-        .close-conversation-btn {
-            background: transparent;
-            border: 1px solid var(--ink-200);
-            padding: 6px 12px;
-            border-radius: var(--r-sm);
-            font-family: var(--font-body);
-            font-size: 12px;
-            cursor: pointer;
-            color: var(--char);
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .close-conversation-btn:hover {
-            background: var(--paper-2);
-            border-color: var(--ink-300);
-        }
-
-        .message {
-            margin-bottom: var(--s-5);
-            position: relative;
-            display: flex;
-            align-items: flex-start;
-            gap: var(--s-2);
-        }
-
-        .message.user {
-            flex-direction: row-reverse;
-        }
-
-        .message-wrapper {
-            padding: var(--s-3) var(--s-4);
-            border-radius: var(--r-md);
-            max-width: 75%;
-            position: relative;
-        }
-
-        .message.user .message-wrapper {
-            background: var(--ink-800);
-            color: var(--paper);
-            text-align: right;
-            border: 1px solid var(--ink-600);
-        }
-
-        .message.agent .message-wrapper {
-            background: var(--paper);
-            color: var(--char);
-            border: 1px solid var(--ink-200);
-        }
-
-        .message-role {
-            font-family: var(--font-mono);
-            font-size: 10px;
-            font-weight: 500;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            margin-bottom: var(--s-2);
-            opacity: 0.6;
-        }
-
-        .message-text {
-            font-size: 14px;
-            line-height: 1.55;
-        }
-
-        .message-actions {
-            flex-shrink: 0;
-            margin-top: 0;
-        }
-
-        .add-note-btn {
-            background: var(--paper);
-            border: 1px solid var(--ink-200);
-            padding: 6px 10px;
-            border-radius: var(--r-sm);
-            font-family: var(--font-body);
-            font-size: 11px;
-            font-weight: 500;
-            cursor: pointer;
-            color: var(--char);
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .add-note-btn:hover {
-            background: var(--paper-2);
-            border-color: var(--ink-300);
-        }
-
-        .note-input {
-            margin-top: var(--s-2);
-            display: none;
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 100%;
-            z-index: 10;
-            background: var(--bone);
-            padding: var(--s-3);
-            border: 1px solid var(--ink-200);
-            border-radius: var(--r-sm);
-            box-shadow: var(--shadow-2);
-        }
-
-        .note-input.active {
-            display: block;
-        }
-
-        .note-input textarea {
-            width: 100%;
-            padding: var(--s-2) var(--s-3);
-            border: 1px solid var(--ink-200);
-            border-radius: var(--r-sm);
-            font-family: var(--font-body);
-            font-size: 13px;
-            color: var(--char);
-            background: var(--paper);
-            resize: vertical;
-            min-height: 70px;
-        }
-
-        .note-input-actions {
-            margin-top: var(--s-2);
-            display: flex;
-            gap: var(--s-2);
-        }
-
-        .note-input-actions button {
-            padding: 8px 14px;
-            border: none;
-            border-radius: var(--r-sm);
-            font-family: var(--font-body);
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .save-note-btn {
-            background: var(--mars-500);
-            color: var(--ink-900);
-        }
-
-        .save-note-btn:hover {
-            background: var(--mars-600);
-        }
-
-        .cancel-note-btn {
-            background: transparent;
-            color: var(--char);
-            border: 1px solid var(--ink-200);
-        }
-
-        .cancel-note-btn:hover {
-            background: var(--paper-2);
-        }
-
-        .message-note {
-            margin-top: var(--s-3);
-            padding: var(--s-2) var(--s-3);
-            background: var(--mars-100);
-            border-left: 3px solid var(--mars-500);
-            border-radius: var(--r-sm);
-            font-size: 12.5px;
-            line-height: 1.5;
-            color: var(--mars-700);
-        }
-
-        .message.user .message-note {
-            background: rgba(168, 156, 61, 0.15);
-            border-left-color: var(--mars-400);
-            color: var(--mars-200);
-        }
-
-        .note-header {
-            font-family: var(--font-mono);
-            font-size: 9.5px;
-            font-weight: 600;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            opacity: 0.7;
-            margin-bottom: var(--s-2);
-        }
-
-        .loading {
-            text-align: center;
-            padding: var(--s-7);
-            color: var(--ink-300);
-            font-family: var(--font-mono);
-            font-size: 11px;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-
-        .error {
-            padding: var(--s-4);
-            background: oklch(94% 0.05 30);
-            color: var(--crit);
-            border: 1px solid var(--crit);
-            border-radius: var(--r-sm);
-            margin: var(--s-4) 0;
-            font-size: 13px;
-        }
-
-        .no-sessions {
-            text-align: center;
-            padding: var(--s-7) var(--s-5);
-            color: var(--ink-300);
-            font-family: var(--font-display);
-            font-style: italic;
-            font-size: 24px;
-        }
-
+        /* ── Artifacts ── */
         .artifacts {
             display: flex;
-            gap: var(--s-2);
-            margin-top: var(--s-3);
+            gap: var(--sp-2);
+            margin-top: var(--sp-3);
+            flex-wrap: wrap;
         }
 
         .artifact {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            font-family: var(--font-mono);
-            font-size: 10px;
-            letter-spacing: 0.06em;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
             text-transform: uppercase;
-            padding: 3px 8px;
+            padding: 3px 10px;
             border-radius: var(--r-pill);
-            background: var(--ink-100);
-            color: var(--ink-600);
+            background: var(--surface-container);
+            color: var(--outline);
+            border: 1px solid var(--outline-variant);
         }
 
         .artifact.available {
-            background: oklch(94% 0.04 140);
-            color: var(--ok);
+            background: var(--secondary-container);
+            color: var(--on-secondary-container);
+            border-color: transparent;
         }
 
         .artifact.available::before {
             content: "";
-            width: 5px;
-            height: 5px;
+            width: 5px; height: 5px;
             border-radius: var(--r-pill);
-            background: var(--ok);
+            background: var(--secondary);
         }
 
+        /* ── Stages ── */
         .stages {
-            margin-top: var(--s-3);
+            margin-top: var(--sp-3);
             display: flex;
             flex-wrap: wrap;
-            gap: var(--s-2);
+            gap: var(--sp-2);
         }
 
         .stage-item {
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            padding: 3px 9px;
+            padding: 3px 10px;
             border-radius: var(--r-pill);
-            font-family: var(--font-mono);
-            font-size: 10px;
-            letter-spacing: 0.06em;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
             text-transform: uppercase;
         }
 
         .stage-item.completed {
-            background: oklch(94% 0.04 140);
-            color: oklch(38% 0.11 140);
+            background: var(--secondary-container);
+            color: var(--on-secondary-container);
         }
 
         .stage-item.completed::before {
             content: "";
-            width: 5px;
-            height: 5px;
+            width: 5px; height: 5px;
             border-radius: var(--r-pill);
-            background: var(--ok);
+            background: var(--secondary);
         }
 
         .stage-item.current {
-            background: var(--mars-100);
-            color: var(--mars-700);
+            background: var(--primary-fixed);
+            color: var(--on-primary-fixed);
         }
 
         .stage-item.current::before {
             content: "";
-            width: 5px;
-            height: 5px;
+            width: 5px; height: 5px;
             border-radius: var(--r-pill);
-            background: var(--mars-500);
+            background: var(--primary);
         }
 
         .stage-item.pending {
-            background: var(--ink-100);
-            color: var(--ink-500);
+            background: var(--surface-container-high);
+            color: var(--outline);
         }
 
         .stage-item.skipped {
-            background: var(--ink-50);
-            color: var(--ink-400);
-            opacity: 0.6;
+            background: var(--surface-container);
+            color: var(--outline);
+            opacity: 0.5;
             text-decoration: line-through;
         }
+
+        /* ── Conversation area ── */
+        .conversation {
+            margin-top: var(--sp-4);
+            padding-top: var(--sp-4);
+            border-top: 1px solid var(--outline-variant);
+            display: none;
+        }
+
+        .conversation.active { display: block; }
+
+        .conversation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--sp-4);
+        }
+
+        .conversation-title {
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+        }
+
+        .close-conversation-btn {
+            background: transparent;
+            border: 1px solid var(--outline-variant);
+            padding: 6px 14px;
+            border-radius: var(--r-pill);
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--on-surface-variant);
+            letter-spacing: 0.04em;
+            transition: border-color 0.15s, color 0.15s;
+        }
+
+        .close-conversation-btn:hover { border-color: var(--outline); color: var(--on-surface); }
+
+        /* ── Message bubbles ── */
+        .message {
+            margin-bottom: var(--sp-3);
+            display: flex;
+            align-items: flex-start;
+            gap: var(--sp-2);
+        }
+
+        .message.user { flex-direction: row-reverse; }
+
+        .message-wrapper {
+            padding: 12px 16px;
+            border-radius: var(--r-lg);
+            max-width: 80%;
+            position: relative;
+        }
+
+        .message.user .message-wrapper {
+            background: var(--inverse-surface);
+            color: var(--inverse-on-surface);
+        }
+
+        .message.agent .message-wrapper {
+            background: var(--surface-container-lowest);
+            color: var(--on-surface);
+            border: 1px solid var(--outline-variant);
+        }
+
+        .message-text {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .message-actions { flex-shrink: 0; margin-top: 2px; }
+
+        .add-note-btn {
+            background: transparent;
+            border: 1px solid var(--outline-variant);
+            padding: 4px 10px;
+            border-radius: var(--r-pill);
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            color: var(--outline);
+            white-space: nowrap;
+            transition: border-color 0.15s, color 0.15s;
+        }
+
+        .add-note-btn:hover { border-color: var(--outline); color: var(--on-surface-variant); }
+
+        /* ── Note input ── */
+        .note-input {
+            display: none;
+            position: absolute;
+            left: 0; right: 0; top: 100%;
+            z-index: 10;
+            margin-top: var(--sp-2);
+            background: var(--surface-container-lowest);
+            padding: var(--sp-3);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-lg);
+        }
+
+        .note-input.active { display: block; }
+
+        .note-input textarea {
+            width: 100%;
+            padding: var(--sp-2) var(--sp-3);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-md);
+            font-family: var(--font-body);
+            font-size: 13px;
+            color: var(--on-surface);
+            background: var(--surface);
+            resize: vertical;
+            min-height: 70px;
+        }
+
+        .note-input textarea:focus { outline: none; border-color: var(--primary); }
+
+        .note-input-actions {
+            margin-top: var(--sp-2);
+            display: flex;
+            gap: var(--sp-2);
+        }
+
+        .note-input-actions button {
+            padding: 7px 16px;
+            border: none;
+            border-radius: var(--r-pill);
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .save-note-btn { background: var(--primary); color: var(--on-primary); }
+        .save-note-btn:hover { opacity: 0.85; }
+
+        .cancel-note-btn {
+            background: transparent;
+            color: var(--on-surface-variant);
+            border: 1px solid var(--outline-variant) !important;
+        }
+
+        .cancel-note-btn:hover { border-color: var(--outline) !important; }
+
+        /* ── Message notes ── */
+        .message-note {
+            margin-top: var(--sp-3);
+            padding: var(--sp-2) var(--sp-3);
+            background: var(--primary-fixed);
+            border-left: 3px solid var(--primary);
+            border-radius: var(--r-sm);
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: var(--on-primary-fixed);
+        }
+
+        .message.user .message-note {
+            background: rgba(210, 240, 78, 0.12);
+            border-left-color: var(--primary-fixed-dim);
+            color: var(--primary-fixed);
+        }
+
+        .note-header {
+            font-family: var(--font-body);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            opacity: 0.6;
+            margin-bottom: var(--sp-2);
+        }
+
+        /* ── Loading / error / empty ── */
+        .loading {
+            text-align: center;
+            padding: var(--sp-6);
+            color: var(--outline);
+            font-family: var(--font-body);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .error {
+            padding: var(--sp-4);
+            background: var(--error-container);
+            color: var(--on-error-container);
+            border: 1px solid var(--error);
+            border-radius: var(--r-md);
+            margin: var(--sp-3) 0;
+            font-size: 13px;
+        }
+
+        .no-sessions {
+            text-align: center;
+            padding: var(--sp-7) var(--sp-5);
+            color: var(--outline);
+            font-family: var(--font-display);
+            font-style: italic;
+            font-size: 28px;
+        }
+
+        /* ── Section dividers (audio, claim) ── */
+        .section-label {
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+            margin-bottom: var(--sp-3);
+        }
+
+        .audio-section {
+            margin-top: var(--sp-4);
+            padding-top: var(--sp-4);
+            border-top: 1px solid var(--outline-variant);
+        }
+
+        .audio-player {
+            width: 100%;
+            accent-color: var(--primary);
+        }
+
+        /* ── Claim State Accordion ── */
+        .claim-accordion {
+            margin-top: var(--sp-4);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            overflow: hidden;
+        }
+
+        .claim-accordion-btn {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px;
+            background: var(--surface-container-low);
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            transition: background 0.15s;
+            gap: var(--sp-2);
+        }
+
+        .claim-accordion-btn:hover { background: var(--surface-container); }
+
+        .claim-accordion-label {
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--on-surface-variant);
+        }
+
+        .claim-accordion-chevron {
+            flex-shrink: 0;
+            color: var(--outline);
+            transition: transform 0.2s ease;
+        }
+
+        .claim-accordion-chevron.open { transform: rotate(180deg); }
+
+        .claim-accordion-body {
+            display: none;
+            padding: var(--sp-4);
+            border-top: 1px solid var(--outline-variant);
+            background: var(--surface-container-lowest);
+        }
+
+        .claim-accordion-body.open { display: block; }
+
+        /* Metadata badges */
+        .claim-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--sp-2);
+            margin-bottom: var(--sp-4);
+        }
+
+        .claim-meta-badge {
+            padding: 3px 10px;
+            border-radius: var(--r-pill);
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            background: var(--secondary-container);
+            color: var(--on-secondary-container);
+        }
+
+        .claim-meta-warn {
+            background: oklch(92% 0.07 55);
+            color: oklch(32% 0.12 55);
+        }
+
+        .claim-meta-ok {
+            background: var(--primary-fixed);
+            color: var(--on-primary-fixed);
+        }
+
+        /* Claim sections */
+        .claim-sections { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+        .claim-section-title {
+            font-family: var(--font-body);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--outline);
+            padding-bottom: var(--sp-2);
+            margin-bottom: var(--sp-3);
+            border-bottom: 1px solid var(--outline-variant);
+        }
+
+        .claim-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: var(--sp-3) var(--sp-4);
+        }
+
+        .claim-field-label {
+            font-family: var(--font-body);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--outline);
+            margin-bottom: 3px;
+        }
+
+        .claim-field-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--on-surface);
+            line-height: 1.4;
+        }
+
+        .claim-bool-pill {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: var(--r-pill);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+
+        .claim-bool-pill.yes {
+            background: var(--primary-fixed);
+            color: var(--on-primary-fixed);
+        }
+
+        .claim-bool-pill.no {
+            background: var(--surface-container-high);
+            color: var(--outline);
+        }
+
+        .claim-no-data {
+            font-size: 13px;
+            color: var(--outline);
+            font-style: italic;
+            padding: 4px 0;
+        }
+
+        /* ── Claim split view ── */
+        .claim-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--sp-4);
+            align-items: start;
+        }
+
+        .claim-col-header {
+            font-family: var(--font-body);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+            margin-bottom: var(--sp-3);
+        }
+
+        .claim-raw-panel {
+            background: var(--inverse-surface);
+            border-radius: var(--r-lg);
+            padding: var(--sp-4);
+            max-height: 520px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .claim-raw-panel pre {
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            color: var(--inverse-on-surface);
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .cj-key  { color: var(--primary-fixed-dim); }
+        .cj-str  { color: var(--inverse-on-surface); }
+        .cj-num  { color: oklch(75% 0.12 200); }
+        .cj-bool { color: var(--primary-fixed); }
+        .cj-null { color: var(--outline); }
     </style>
 </head>
 <body>
@@ -660,18 +813,17 @@
             return date.toLocaleString();
         }
 
-        function renderMessage(event, index, sessionId) {
-            const isUser = event.role === 'user';
+        function renderMessage(group, index, sessionId) {
+            const isUser = group.role === 'user';
             const role = isUser ? 'Caller' : 'Agent';
-            const text = event.content || event.text || '';
-            const messageId = `${sessionId}::${index}`;
+            const text = group.texts.join(' ');
+            const messageId = `${sessionId}::g${index}`;
             const note = getNoteForMessage(messageId);
 
             return `
                 <div class="message ${isUser ? 'user' : 'agent'}" data-message-id="${messageId}">
                     <div class="message-wrapper">
-                        <div class="message-role">${role}</div>
-                        <div class="message-text">${escapeHtml(text)}</div>
+                        <div class="message-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
                         ${note ? `
                             <div class="message-note">
                                 <div class="note-header">Note</div>
@@ -695,13 +847,116 @@
             `;
         }
 
+        function colorizeJson(obj) {
+            const raw = JSON.stringify(obj, null, 2);
+            return raw.replace(
+                /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+\.?\d*([eE][+-]?\d+)?)/g,
+                m => {
+                    if (/^"/.test(m)) return m.endsWith(':') ? `<span class="cj-key">${m}</span>` : `<span class="cj-str">${m}</span>`;
+                    if (/true|false/.test(m)) return `<span class="cj-bool">${m}</span>`;
+                    if (/null/.test(m))       return `<span class="cj-null">${m}</span>`;
+                    return `<span class="cj-num">${m}</span>`;
+                }
+            );
+        }
+
+        function toggleClaimBody(sessionId) {
+            const body = document.getElementById(`claim-body-${sessionId}`);
+            const icon = document.getElementById(`claim-icon-${sessionId}`);
+            if (!body) return;
+            const open = body.classList.toggle('open');
+            icon.classList.toggle('open', open);
+        }
+
+        function renderClaimField(label, value) {
+            let inner;
+            if (typeof value === 'boolean') {
+                inner = `<span class="claim-bool-pill ${value ? 'yes' : 'no'}">${value ? 'Yes' : 'No'}</span>`;
+            } else {
+                inner = `<span class="claim-field-value">${escapeHtml(String(value))}</span>`;
+            }
+            return `<div class="claim-field"><div class="claim-field-label">${label}</div>${inner}</div>`;
+        }
+
+        function renderClaimState(state) {
+            if (!state) return '<p class="claim-no-data">No claim data collected yet.</p>';
+
+            const isFilled = v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+            const sections = [
+                { title: 'Customer', fields: [
+                    ['Name',             state.customer?.full_name],
+                    ['Policy number',    state.customer?.policy_number],
+                    ['Date of birth',    state.customer?.date_of_birth],
+                    ['Contact method',   state.customer?.preferred_contact_method],
+                    ['Identity verified',state.customer?.identity_verified],
+                    ['Is policyholder',  state.customer?.is_policyholder],
+                    ['Caller name',      state.customer?.caller_name],
+                    ['Relationship',     state.customer?.relationship_to_policyholder],
+                ]},
+                { title: 'Incident', fields: [
+                    ['Date',        state.incident?.date],
+                    ['Time',        state.incident?.time],
+                    ['Location',    state.incident?.location],
+                    ['Description', state.incident?.description],
+                ]},
+                { title: 'Damage', fields: [
+                    ['Items',            Array.isArray(state.damage?.items) && state.damage.items.length ? state.damage.items.join(', ') : null],
+                    ['Description',      state.damage?.description],
+                    ['Estimated value',  state.damage?.estimated_value],
+                    ['Photos available', state.damage?.photos_available],
+                ]},
+                { title: 'Safety', fields: [
+                    ['Injuries',              state.safety?.injuries],
+                    ['Police report',         state.safety?.police_report],
+                    ['Police report details', state.safety?.police_report_details],
+                    ['Urgent risk',           state.safety?.urgent_risk],
+                ]},
+                { title: 'Third Parties', fields: [
+                    ['Involved',     state.third_parties?.involved],
+                    ['Details',      state.third_parties?.details],
+                    ['Witness info', state.third_parties?.witness_info],
+                ]},
+                { title: 'Services', fields: [
+                    ['Rental car needed',      state.services?.rental_car_needed],
+                    ['Rental car preference',  state.services?.rental_car_preference],
+                    ['Repair shop selected',   state.services?.repair_shop_selected],
+                    ['Repair shop preference', state.services?.repair_shop_preference],
+                ]},
+                { title: 'Documents', fields: [
+                    ['Photos',       state.documents?.photos],
+                    ['Receipts',     state.documents?.receipts],
+                    ['Police report',state.documents?.police_report],
+                ]},
+            ];
+
+            const filledSections = sections
+                .map(s => ({ ...s, fields: s.fields.filter(([, v]) => isFilled(v)) }))
+                .filter(s => s.fields.length > 0);
+
+            if (filledSections.length === 0)
+                return '<p class="claim-no-data">No claim data collected yet.</p>';
+
+            return `
+                <div class="claim-sections">
+                    ${filledSections.map(s => `
+                        <div>
+                            <div class="claim-section-title">${s.title}</div>
+                            <div class="claim-fields">
+                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
-        // Note management using localStorage
         function getNoteForMessage(messageId) {
             const notes = JSON.parse(localStorage.getItem('message_notes') || '{}');
             return notes[messageId] || null;
@@ -721,18 +976,14 @@
             const input = document.getElementById(`note-input-${messageId}`);
             const isActive = input.classList.contains('active');
 
-            // Close all other note inputs
             document.querySelectorAll('.note-input.active').forEach(el => {
-                if (el.id !== `note-input-${messageId}`) {
-                    el.classList.remove('active');
-                }
+                if (el.id !== `note-input-${messageId}`) el.classList.remove('active');
             });
 
             if (!isActive) {
                 input.classList.add('active');
                 const textarea = input.querySelector('textarea');
-                const existingNote = getNoteForMessage(messageId);
-                textarea.value = existingNote || '';
+                textarea.value = getNoteForMessage(messageId) || '';
                 textarea.focus();
             } else {
                 input.classList.remove('active');
@@ -745,21 +996,17 @@
             saveNoteForMessage(messageId, textarea.value);
             input.classList.remove('active');
 
-            // Get session ID from messageId (split by :: separator)
             const sessionId = messageId.split('::')[0];
             const container = document.getElementById(`conversation-${sessionId}`);
             loadConversation(sessionId, container);
         }
 
         function cancelNote(messageId) {
-            const input = document.getElementById(`note-input-${messageId}`);
-            input.classList.remove('active');
+            document.getElementById(`note-input-${messageId}`).classList.remove('active');
         }
 
-        // URL management
         function getSessionIdFromUrl() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('session');
+            return new URLSearchParams(window.location.search).get('session');
         }
 
         function setSessionInUrl(sessionId) {
@@ -776,20 +1023,16 @@
             const conversation = document.getElementById(`conversation-${sessionId}`);
             if (conversation) {
                 conversation.classList.remove('active');
-                // Clear URL parameter
                 setSessionInUrl(null);
             }
         }
 
         function renderStages(stages) {
             if (!stages || stages.length === 0) return '';
-
             return `
                 <div class="stages">
                     ${stages.map(stage => `
-                        <span class="stage-item ${stage.status}">
-                            ${stage.name}
-                        </span>
+                        <span class="stage-item ${stage.status}">${stage.name}</span>
                     `).join('')}
                 </div>
             `;
@@ -823,20 +1066,30 @@
             try {
                 const events = await fetchEvents(sessionId);
 
-                // Filter to only show user and agent messages (not system or tool calls)
                 const messages = events.filter(e =>
                     (e.role === 'user' || e.role === 'agent' || e.role === 'model') &&
                     (e.content || e.text) &&
                     e.role !== 'system'
                 );
 
-                console.log('Filtered messages:', messages.length);
+                // Group consecutive messages from the same actor into one bubble
+                const groups = [];
+                for (const msg of messages) {
+                    const text = msg.content || msg.text || '';
+                    const last = groups[groups.length - 1];
+                    if (last && last.role === msg.role) {
+                        last.texts.push(text);
+                    } else {
+                        groups.push({ role: msg.role, texts: [text] });
+                    }
+                }
 
-                const messagesHtml = messages.length === 0
-                    ? '<div style="padding: 20px; text-align: center; color: #666;">No messages in this session</div>'
-                    : messages.map((msg, idx) => renderMessage(msg, idx, sessionId)).join('');
+                console.log('Filtered messages:', messages.length, '→', groups.length, 'groups');
 
-                // Preserve the header, only update the messages
+                const messagesHtml = groups.length === 0
+                    ? '<div style="padding: 20px; text-align: center; color: var(--outline);">No messages in this session</div>'
+                    : groups.map((group, idx) => renderMessage(group, idx, sessionId)).join('');
+
                 const header = container.querySelector('.conversation-header');
                 container.innerHTML = '';
                 if (header) {
@@ -855,9 +1108,7 @@
             } catch (error) {
                 const header = container.querySelector('.conversation-header');
                 container.innerHTML = '';
-                if (header) {
-                    container.appendChild(header);
-                }
+                if (header) container.appendChild(header);
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'error';
                 errorDiv.textContent = `Failed to load conversation: ${error.message}`;
@@ -873,13 +1124,11 @@
                 filteredSessions = allSessions;
             } else {
                 const lowerQuery = query.toLowerCase();
-                filteredSessions = allSessions.filter(session => {
-                    return (
-                        session.session_id.toLowerCase().includes(lowerQuery) ||
-                        (session.current_stage && session.current_stage.toLowerCase().includes(lowerQuery)) ||
-                        (session.created_at && session.created_at.toLowerCase().includes(lowerQuery))
-                    );
-                });
+                filteredSessions = allSessions.filter(session =>
+                    session.session_id.toLowerCase().includes(lowerQuery) ||
+                    (session.current_stage && session.current_stage.toLowerCase().includes(lowerQuery)) ||
+                    (session.created_at && session.created_at.toLowerCase().includes(lowerQuery))
+                );
             }
             updateFilterStats();
             renderSessionsList();
@@ -887,9 +1136,7 @@
 
         function updateFilterStats() {
             const stats = document.getElementById('filterStats');
-            if (stats) {
-                stats.textContent = `${filteredSessions.length} of ${allSessions.length} sessions`;
-            }
+            if (stats) stats.textContent = `${filteredSessions.length} of ${allSessions.length} sessions`;
         }
 
         function renderSessionsList() {
@@ -904,56 +1151,79 @@
 
         function attachSessionClickHandlers() {
             document.querySelectorAll('.session-card').forEach(card => {
-                card.addEventListener('click', async (e) => {
-                    const sessionId = card.dataset.sessionId;
-                    await showSessionDetail(sessionId);
+                card.addEventListener('click', async () => {
+                    await showSessionDetail(card.dataset.sessionId);
                 });
             });
         }
 
         async function showSessionDetail(sessionId) {
-            // Hide main view, show detail view
             document.getElementById('mainView').style.display = 'none';
             document.getElementById('detailView').classList.add('active');
             document.getElementById('backBtn').classList.add('visible');
-
-            // Update URL
             setSessionInUrl(sessionId);
 
-            // Find session data
             const session = allSessions.find(s => s.session_id === sessionId);
             if (!session) return;
 
-            // Render detail view
             const detailView = document.getElementById('detailView');
+            const sid = session.session_id;
+            const hasAudio = session.artifacts?.audio;
+            const hasClaim = session.state != null;
+
             detailView.innerHTML = `
                 <div class="session-card">
                     <div class="session-header">
                         <div>
-                            <div class="session-id">${session.session_id}</div>
+                            <div class="session-id">${sid}</div>
                             <div class="session-date">${formatDate(session.created_at)}</div>
-                            ${session.current_stage ? `<div style="margin-top: 8px;"><span class="session-stage">${session.current_stage}</span></div>` : ''}
-                            ${renderStages(session.stages || [])}
+                            ${session.current_stage ? `<div style="margin-top: 6px; font-size: 13px; color: var(--on-surface-variant);">Stage: <strong>${session.current_stage}</strong></div>` : ''}
                         </div>
                     </div>
-                    <div class="artifacts">
-                        <span class="artifact ${session.artifacts?.transcript ? 'available' : ''}">Transcript</span>
-                        <span class="artifact ${session.artifacts?.audio ? 'available' : ''}">Audio</span>
-                        <span class="artifact ${session.artifacts?.events ? 'available' : ''}">Events</span>
-                        <span class="artifact ${session.artifacts?.claim ? 'available' : ''}">Claim</span>
+
+                    ${hasAudio ? `
+                    <div class="audio-section">
+                        <div class="section-label">Recording</div>
+                        <audio class="audio-player" controls preload="metadata"
+                               src="${API_BASE}/api/sessions/${sid}/audio"></audio>
                     </div>
+                    ` : ''}
+
+                    ${hasClaim ? `
+                    <div class="claim-accordion">
+                        <button class="claim-accordion-btn" onclick="toggleClaimBody('${sid}')">
+                            <span class="claim-accordion-label">Claim State</span>
+                            <svg class="claim-accordion-chevron" id="claim-icon-${sid}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div class="claim-accordion-body" id="claim-body-${sid}">
+                            <div class="claim-split">
+                                <div>
+                                    <div class="claim-col-header">Structured</div>
+                                    ${renderClaimState(session.state)}
+                                </div>
+                                <div>
+                                    <div class="claim-col-header">Raw JSON</div>
+                                    <div class="claim-raw-panel">
+                                        <pre>${colorizeJson(session.state)}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <div class="conversation active" id="conversation-detail">
                         <div class="conversation-header">
                             <div class="conversation-title">Conversation</div>
                         </div>
-                        <div class="loading">Loading conversation...</div>
+                        <div class="loading">Loading conversation…</div>
                     </div>
                 </div>
             `;
 
-            // Load conversation
-            const conversation = document.getElementById('conversation-detail');
-            await loadConversation(sessionId, conversation);
+            await loadConversation(sessionId, document.getElementById('conversation-detail'));
         }
 
         function goBackToList() {
@@ -965,7 +1235,7 @@
 
         async function init() {
             const content = document.getElementById('content');
-            content.innerHTML = '<div class="loading">Loading sessions...</div>';
+            content.innerHTML = '<div class="loading">Loading sessions…</div>';
 
             try {
                 allSessions = await fetchSessions();
@@ -980,19 +1250,13 @@
                 updateFilterStats();
                 renderSessionsList();
 
-                // Setup filter input
                 const filterInput = document.getElementById('filterInput');
                 if (filterInput) {
-                    filterInput.addEventListener('input', (e) => {
-                        filterSessions(e.target.value);
-                    });
+                    filterInput.addEventListener('input', e => filterSessions(e.target.value));
                 }
 
-                // Check if URL has session parameter
                 const urlSessionId = getSessionIdFromUrl();
-                if (urlSessionId) {
-                    await showSessionDetail(urlSessionId);
-                }
+                if (urlSessionId) await showSessionDetail(urlSessionId);
             } catch (error) {
                 content.innerHTML = `<div class="error">Failed to load sessions: ${error.message}</div>`;
             }
@@ -1000,13 +1264,9 @@
 
         // Auto-refresh every 30 seconds (only when on list view)
         setInterval(() => {
-            const detailView = document.getElementById('detailView');
-            if (!detailView || !detailView.classList.contains('active')) {
-                init();
-            }
+            if (!document.getElementById('detailView')?.classList.contains('active')) init();
         }, 30000);
 
-        // Initial load
         init();
     </script>
 </body>

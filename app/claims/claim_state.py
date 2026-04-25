@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def utc_now_iso() -> str:
@@ -35,6 +35,13 @@ class Damage(BaseModel):
     description: str | None = None
     estimated_value: str | int | float | None = None
     photos_available: bool | None = None
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def coerce_items(cls, v: object) -> object:
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
 
 class ThirdParties(BaseModel):
