@@ -22,6 +22,13 @@ from app.claims.playbook_engine import PlaybookEngine
 _MAX_RECONNECT_ATTEMPTS = 3
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def new_session_id() -> str:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"claim_{stamp}_{uuid4().hex[:4]}"
@@ -102,7 +109,7 @@ def _build_audio_config(playbook_engine: PlaybookEngine, claim_state: ClaimState
 
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
-        system_instruction=build_system_prompt(playbook_engine, claim_state),
+        system_instruction=build_system_prompt(playbook_engine, claim_state, voice_mode=True),
         tools=tools,
         speech_config=types.SpeechConfig(
             voice_config=types.VoiceConfig(
@@ -143,6 +150,26 @@ async def _run_voice_session(
 
         try:
             async with client.aio.live.connect(model=model, config=config) as session:
+                audio_queue: asyncio.Queue = asyncio.Queue()
+                speaking_event = (
+                    asyncio.Event()
+                    if _env_flag("MUTE_MIC_DURING_PLAYBACK", True)
+                    else None
+                )
+
+                receive_task = asyncio.create_task(
+                    _receive_voice_loop(
+                        session,
+                        handlers,
+                        logger,
+                        audio_queue,
+                        FLUSH,
+                        speaking_event=speaking_event,
+                    )
+                )
+                play_task = asyncio.create_task(play_audio(audio_queue, speaking_event))
+                send_task = asyncio.create_task(send_audio(session, speaking_event))
+
                 if attempt == 0:
                     greeting = "Begin the claims intake now. Greet the customer and ask for the first required field."
                 else:
@@ -150,19 +177,8 @@ async def _run_voice_session(
                         f"Reconnecting after session timeout. {claim_state.summary()}. "
                         "Continue the intake from where we left off."
                     )
-                await session.send_client_content(
-                    turns=types.Content(role="user", parts=[types.Part(text=greeting)]),
-                    turn_complete=True,
-                )
+                await send_live_text(session, greeting)
                 logger.log("control", greeting)
-
-                audio_queue: asyncio.Queue = asyncio.Queue()
-
-                receive_task = asyncio.create_task(
-                    _receive_voice_loop(session, handlers, logger, audio_queue, FLUSH)
-                )
-                play_task = asyncio.create_task(play_audio(audio_queue))
-                send_task = asyncio.create_task(send_audio(session))
 
                 done, pending = await asyncio.wait(
                     {receive_task, play_task, send_task},
@@ -182,11 +198,33 @@ async def _run_voice_session(
                         raise exc
                 return claim_state
 
-        except SessionFinished:
-            raise
+        except SessionFinished as exc:
+            if exc.reason != "session_ended":
+                raise
+            claim_state.save(storage_dir)
+            logger.log(
+                "session",
+                {
+                    "event": "disconnect",
+                    "attempt": attempt + 1,
+                    "reason": exc.reason,
+                },
+            )
+            if attempt < _MAX_RECONNECT_ATTEMPTS - 1:
+                print(
+                    "\nLive session ended before the claim was completed. "
+                    f"Reconnecting ({attempt + 2}/{_MAX_RECONNECT_ATTEMPTS})...",
+                    flush=True,
+                )
+                await asyncio.sleep(2)
+            else:
+                raise SessionFinished("reconnect_failed") from exc
         except Exception as exc:
             claim_state.save(storage_dir)
             logger.log("session", {"event": "disconnect", "attempt": attempt + 1, "reason": str(exc)})
+            if _is_policy_violation(exc):
+                print_exception(exc)
+                raise SessionFinished("live_policy_violation") from exc
             if attempt < _MAX_RECONNECT_ATTEMPTS - 1:
                 print(
                     f"\nConnection lost ({exc}). "
@@ -206,33 +244,42 @@ async def _receive_voice_loop(
     logger: TranscriptLogger,
     audio_queue: asyncio.Queue,
     flush_sentinel: object,
+    speaking_event: asyncio.Event | None = None,
 ) -> None:
-    async for response in session.receive():
-        server_content = getattr(response, "server_content", None)
-        if server_content:
-            if getattr(server_content, "interrupted", False):
-                await audio_queue.put(flush_sentinel)
-                continue
-            model_turn = getattr(server_content, "model_turn", None)
-            for part in getattr(model_turn, "parts", []) or []:
-                inline_data = getattr(part, "inline_data", None)
-                if inline_data and getattr(inline_data, "data", None):
-                    await audio_queue.put(inline_data.data)
+    while True:
+        received_response = False
+        async for response in session.receive():
+            received_response = True
+            server_content = getattr(response, "server_content", None)
+            if server_content:
+                if getattr(server_content, "interrupted", False):
+                    logger.log("session", {"event": "interrupted"})
+                    if speaking_event:
+                        speaking_event.clear()
+                    await audio_queue.put(flush_sentinel)
+                    continue
+                model_turn = getattr(server_content, "model_turn", None)
+                for part in getattr(model_turn, "parts", []) or []:
+                    inline_data = getattr(part, "inline_data", None)
+                    if inline_data and getattr(inline_data, "data", None):
+                        if speaking_event:
+                            speaking_event.set()
+                        await audio_queue.put(inline_data.data)
 
-        tool_call = getattr(response, "tool_call", None)
-        if tool_call:
-            for call in getattr(tool_call, "function_calls", []) or []:
-                name = getattr(call, "name", "")
-                args = dict(getattr(call, "args", {}) or {})
-                call_id = getattr(call, "id", None)
-                logger.log("tool_call", {"name": name, "args": args})
-                result = handlers.dispatch(name, args)
-                logger.log("tool_response", {"name": name, "result": result})
-                await _send_tool_response(session, name, result, call_id)
-                if handlers.finished_reason:
-                    raise SessionFinished(handlers.finished_reason)
-
-    raise SessionFinished("session_ended")
+            tool_call = getattr(response, "tool_call", None)
+            if tool_call:
+                for call in getattr(tool_call, "function_calls", []) or []:
+                    name = getattr(call, "name", "")
+                    args = dict(getattr(call, "args", {}) or {})
+                    call_id = getattr(call, "id", None)
+                    logger.log("tool_call", {"name": name, "args": args})
+                    result = handlers.dispatch(name, args)
+                    logger.log("tool_response", {"name": name, "result": result})
+                    await _send_tool_response(session, name, result, call_id)
+                    if handlers.finished_reason:
+                        raise SessionFinished(handlers.finished_reason)
+        if not received_response:
+            await asyncio.sleep(0.05)
 
 
 # ---------------------------------------------------------------------------
@@ -467,10 +514,11 @@ async def send_text_loop(
 
 
 async def send_user_turn(live_session: Any, user_input: str) -> None:
-    await live_session.send_client_content(
-        turns=types.Content(role="user", parts=[types.Part(text=user_input)]),
-        turn_complete=True,
-    )
+    await send_live_text(live_session, user_input)
+
+
+async def send_live_text(live_session: Any, text: str) -> None:
+    await live_session.send_realtime_input(text=text)
 
 
 async def receive_loop(
@@ -479,22 +527,27 @@ async def receive_loop(
     logger: TranscriptLogger,
 ) -> None:
     model_buffer: list[str] = []
-    async for response in live_session.receive():
-        text = extract_text(response)
-        if text:
-            model_buffer.append(text)
-            print(text, end="", flush=True)
+    while True:
+        received_response = False
+        async for response in live_session.receive():
+            received_response = True
+            text = extract_text(response)
+            if text:
+                model_buffer.append(text)
+                print(text, end="", flush=True)
 
-        for call in extract_function_calls(response):
-            if model_buffer:
-                logger.log("model", "".join(model_buffer))
-                model_buffer.clear()
-            logger.log("tool_call", {"name": call["name"], "args": call["args"]})
-            result = handlers.dispatch(call["name"], call["args"])
-            logger.log("tool_response", {"name": call["name"], "result": result})
-            await _send_tool_response(live_session, call["name"], result, call.get("id"))
-            if handlers.finished_reason:
-                raise SessionFinished(handlers.finished_reason)
+            for call in extract_function_calls(response):
+                if model_buffer:
+                    logger.log("model", "".join(model_buffer))
+                    model_buffer.clear()
+                logger.log("tool_call", {"name": call["name"], "args": call["args"]})
+                result = handlers.dispatch(call["name"], call["args"])
+                logger.log("tool_response", {"name": call["name"], "result": result})
+                await _send_tool_response(live_session, call["name"], result, call.get("id"))
+                if handlers.finished_reason:
+                    raise SessionFinished(handlers.finished_reason)
+        if not received_response:
+            await asyncio.sleep(0.05)
 
 
 def extract_text(response: Any) -> str:
@@ -559,3 +612,17 @@ def print_exception(exc: Exception) -> None:
             file=sys.stderr,
             flush=True,
         )
+    if _is_policy_violation(exc):
+        print(
+            "Hint: Gemini Live closed the websocket with policy violation 1008. "
+            "For Gemini 3.1 Live, text turns must be sent with send_realtime_input; "
+            "send_client_content is only for initial history seeding when configured. "
+            "If this still fails, verify Live API access for your API key and model.",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def _is_policy_violation(exc: Exception) -> bool:
+    message = str(exc)
+    return "1008" in message or "policy violation" in message.lower()

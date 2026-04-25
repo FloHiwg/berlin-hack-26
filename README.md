@@ -31,6 +31,14 @@ GEMINI_TEXT_MODEL=gemini-2.5-flash
 GEMINI_API_VERSION=v1alpha
 ```
 
+Voice mode defaults to suppressing microphone chunks while Gemini audio is
+playing, which avoids laptop speaker audio triggering a false barge-in. To allow
+barge-in while using headphones or echo cancellation, set:
+
+```env
+MUTE_MIC_DURING_PLAYBACK=false
+```
+
 ## Run
 
 Start the Phase 1 text-mode intake agent:

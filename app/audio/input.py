@@ -10,7 +10,10 @@ _SAMPLE_RATE = 16000
 _CHUNK_FRAMES = 1024
 
 
-async def send_audio(session: Any) -> None:
+async def send_audio(
+    session: Any,
+    suppress_when: asyncio.Event | None = None,
+) -> None:
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue[bytes] = asyncio.Queue()
 
@@ -26,6 +29,8 @@ async def send_audio(session: Any) -> None:
     ):
         while True:
             chunk = await queue.get()
+            if suppress_when and suppress_when.is_set():
+                continue
             await session.send_realtime_input(
                 audio=types.Blob(data=chunk, mime_type="audio/pcm;rate=16000")
             )
