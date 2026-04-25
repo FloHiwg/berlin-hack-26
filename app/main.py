@@ -52,12 +52,6 @@ def parse_args() -> argparse.Namespace:
         help="Start the FastAPI server for Twilio phone integration.",
     )
     parser.add_argument(
-        "--call",
-        metavar="PHONE_NUMBER",
-        default=None,
-        help="Dial a number via Twilio (requires TWILIO_PUBLIC_URL in .env).",
-    )
-    parser.add_argument(
         "--port",
         type=int,
         default=8080,
@@ -72,10 +66,6 @@ async def async_main() -> None:
 
     if args.twilio_server:
         _run_twilio_server(args.port)
-        return
-
-    if args.call:
-        _make_call(args.call)
         return
 
     try:
@@ -99,17 +89,6 @@ def _run_twilio_server(port: int) -> None:
 
     print(f"Starting Twilio server on port {port}. Set TWILIO_PUBLIC_URL to your tunnel URL.")
     uvicorn.run(twilio_app, host="0.0.0.0", port=port)
-
-
-def _make_call(to: str) -> None:
-    from app.twilio.client import make_outbound_call
-
-    public_url = __import__("os").getenv("TWILIO_PUBLIC_URL", "")
-    if not public_url:
-        print("TWILIO_PUBLIC_URL is required for outbound calls.")
-        return
-    call_sid = make_outbound_call(to, public_url)
-    print(f"Call initiated: {call_sid}")
 
 
 def main() -> None:
