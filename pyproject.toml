@@ -1,0 +1,24 @@
+[project]
+name = "voice-project"
+version = "0.1.0"
+description = "Text-mode insurance claims intake agent using Gemini Live and a YAML playbook."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0.0",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

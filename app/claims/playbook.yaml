@@ -1,0 +1,46 @@
+states:
+  identify_customer:
+    required:
+      - customer.full_name
+      - customer.policy_number
+      - customer.date_of_birth
+    next: classify_claim
+
+  classify_claim:
+    required:
+      - claim_type
+      - incident.date
+      - incident.location
+    next: collect_incident
+
+  collect_incident:
+    required:
+      - incident.time
+      - incident.description
+      - damage.items
+      - third_parties.involved
+      - safety.injuries
+      - safety.urgent_risk
+    next: collect_damage
+
+  collect_damage:
+    required:
+      - damage.description
+      - damage.estimated_value
+      - damage.photos_available
+    next: collect_documents
+
+  collect_documents:
+    required:
+      - documents.photos
+      - documents.receipts
+      - documents.police_report
+    next: finalize
+
+  finalize:
+    required: []
+    next: done
+
+  escalate:
+    trigger: handoff_required == true OR safety.urgent_risk == true
+    action: notify_human_agent

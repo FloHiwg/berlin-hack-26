@@ -1,0 +1,1 @@
+"""Claims intake application."""
