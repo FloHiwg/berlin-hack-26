@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from google import genai
 from google.genai import types
+from google.genai import errors
 
 from app.agent.prompts import build_system_prompt
 from app.agent.schemas import tools
@@ -45,6 +46,7 @@ async def run_session(
     playbook_path: Path,
     storage_dir: Path,
     eval_transcript: Path | None = None,
+    transport: str = "auto",
 ) -> ClaimState:
     if not text_mode:
         raise NotImplementedError("Phase 1 supports --text-mode only.")
@@ -62,7 +64,11 @@ async def run_session(
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is missing. Add it to .env or your shell.")
 
-    client = genai.Client(api_key=api_key)
+    api_version = os.getenv("GEMINI_API_VERSION", "v1alpha")
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(api_version=api_version),
+    )
     model = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-live-preview")
     config = types.LiveConnectConfig(
         response_modalities=["TEXT"],
@@ -70,6 +76,47 @@ async def run_session(
         tools=tools,
     )
 
+    if transport in {"auto", "live"}:
+        try:
+            await run_live_text_session(
+                client=client,
+                model=model,
+                config=config,
+                handlers=handlers,
+                logger=logger,
+                eval_transcript=eval_transcript,
+            )
+            return claim_state
+        except errors.APIError as exc:
+            if transport == "live":
+                raise
+            print_exception(exc)
+            print(
+                "\nFalling back to Gemini generateContent text transport.\n",
+                flush=True,
+            )
+
+    await run_generate_content_text_session(
+        client=client,
+        handlers=handlers,
+        logger=logger,
+        playbook_engine=playbook_engine,
+        claim_state=claim_state,
+        eval_transcript=eval_transcript,
+    )
+
+    return claim_state
+
+
+async def run_live_text_session(
+    *,
+    client: genai.Client,
+    model: str,
+    config: types.LiveConnectConfig,
+    handlers: ClaimToolHandlers,
+    logger: TranscriptLogger,
+    eval_transcript: Path | None,
+) -> None:
     async with client.aio.live.connect(model=model, config=config) as live_session:
         await send_user_turn(
             live_session,
@@ -79,9 +126,7 @@ async def run_session(
             "control",
             "Requested initial greeting and first claims intake question.",
         )
-        receive_task = asyncio.create_task(
-            receive_loop(live_session, handlers, logger)
-        )
+        receive_task = asyncio.create_task(receive_loop(live_session, handlers, logger))
         send_task = asyncio.create_task(
             send_text_loop(live_session, logger, eval_transcript)
         )
@@ -98,7 +143,115 @@ async def run_session(
             elif exc is not None:
                 raise exc
 
-    return claim_state
+
+async def run_generate_content_text_session(
+    *,
+    client: genai.Client,
+    handlers: ClaimToolHandlers,
+    logger: TranscriptLogger,
+    playbook_engine: PlaybookEngine,
+    claim_state: ClaimState,
+    eval_transcript: Path | None,
+) -> None:
+    model = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+    history: list[types.Content] = []
+    config = types.GenerateContentConfig(
+        system_instruction=build_system_prompt(playbook_engine, claim_state),
+        tools=tools,
+    )
+
+    await generate_content_turn(
+        client,
+        model,
+        config,
+        history,
+        handlers,
+        logger,
+        "Begin the claims intake now. Greet the customer and ask for the first required field.",
+        "control",
+    )
+
+    if eval_transcript:
+        lines = [
+            line.strip()
+            for line in eval_transcript.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        for user_input in lines:
+            print(f"\nYou: {user_input}", flush=True)
+            await generate_content_turn(
+                client, model, config, history, handlers, logger, user_input, "user"
+            )
+            if handlers.finished_reason:
+                raise SessionFinished(handlers.finished_reason)
+        return
+
+    while True:
+        user_input = await asyncio.to_thread(input, "\nYou: ")
+        if user_input.strip().lower() in {"exit", "quit"}:
+            raise SessionFinished("user_exit")
+        await generate_content_turn(
+            client, model, config, history, handlers, logger, user_input, "user"
+        )
+        if handlers.finished_reason:
+            raise SessionFinished(handlers.finished_reason)
+
+
+async def generate_content_turn(
+    client: genai.Client,
+    model: str,
+    config: types.GenerateContentConfig,
+    history: list[types.Content],
+    handlers: ClaimToolHandlers,
+    logger: TranscriptLogger,
+    text: str,
+    role: str,
+) -> None:
+    user_content = types.Content(role="user", parts=[types.Part(text=text)])
+    history.append(user_content)
+    logger.log(role, text)
+
+    while True:
+        response = await client.aio.models.generate_content(
+            model=model,
+            contents=history,
+            config=config,
+        )
+        model_content = response.candidates[0].content
+        history.append(model_content)
+
+        text_parts = [
+            part.text for part in model_content.parts or [] if getattr(part, "text", None)
+        ]
+        if text_parts:
+            model_text = "".join(text_parts)
+            logger.log("model", model_text)
+            for char in model_text:
+                print(char, end="", flush=True)
+            print(flush=True)
+
+        function_calls = response.function_calls or []
+        if not function_calls:
+            return
+
+        response_parts: list[types.Part] = []
+        for function_call in function_calls:
+            args = dict(function_call.args or {})
+            logger.log("tool_call", {"name": function_call.name, "args": args})
+            result = handlers.dispatch(function_call.name, args)
+            logger.log(
+                "tool_response",
+                {"name": function_call.name, "result": result},
+            )
+            response_parts.append(
+                types.Part.from_function_response(
+                    name=function_call.name,
+                    response=result,
+                )
+            )
+        history.append(types.Content(role="tool", parts=response_parts))
+        if handlers.finished_reason:
+            raise SessionFinished(handlers.finished_reason)
 
 
 async def send_text_loop(
@@ -128,7 +281,8 @@ async def send_text_loop(
 
 async def send_user_turn(live_session: Any, user_input: str) -> None:
     await live_session.send_client_content(
-        turns=types.Content(role="user", parts=[types.Part(text=user_input)])
+        turns=types.Content(role="user", parts=[types.Part(text=user_input)]),
+        turn_complete=True,
     )
 
 
@@ -203,3 +357,18 @@ async def send_tool_response(
 
 def print_exception(exc: Exception) -> None:
     print(f"\nError: {exc}", file=sys.stderr, flush=True)
+    if exc.__class__.__name__ == "APIError" and "1011" in str(exc):
+        print(
+            "Hint: Gemini Live closed during setup. Check that GEMINI_MODEL is a "
+            "Live-capable text model, for example gemini-3.1-flash-live-preview.",
+            file=sys.stderr,
+            flush=True,
+        )
+    if exc.__class__.__name__ == "APIError" and "1008" in str(exc):
+        print(
+            "Hint: Gemini Live rejected the setup. Check GEMINI_API_VERSION and "
+            "GEMINI_MODEL; the default text-mode pair is v1alpha with "
+            "gemini-3.1-flash-live-preview.",
+            file=sys.stderr,
+            flush=True,
+        )

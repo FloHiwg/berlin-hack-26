@@ -29,7 +29,7 @@ class Incident(BaseModel):
 class Damage(BaseModel):
     items: list[str] = Field(default_factory=list)
     description: str | None = None
-    estimated_value: str | None = None
+    estimated_value: str | int | float | None = None
     photos_available: bool | None = None
 
 
@@ -39,7 +39,7 @@ class ThirdParties(BaseModel):
 
 
 class Safety(BaseModel):
-    injuries: str | None = None
+    injuries: bool | str | None = None
     police_report: bool | None = None
     urgent_risk: bool | None = None
 
@@ -66,15 +66,23 @@ class ClaimState(BaseModel):
     created_at: str = Field(default_factory=utc_now_iso)
     completed_at: str | None = None
 
-    def merge_update(self, update: dict[str, Any]) -> None:
+    def merge_update(self, update: dict[str, Any]) -> list[str]:
+        invalid_fields: list[str] = []
         for key, value in update.items():
             if value is None:
                 continue
             if isinstance(value, dict) and "." not in key:
                 for nested_key, nested_value in flatten_dict(value, key).items():
-                    self.set_path(nested_key, nested_value)
+                    try:
+                        self.set_path(nested_key, nested_value)
+                    except ValueError:
+                        invalid_fields.append(nested_key)
             else:
-                self.set_path(key, value)
+                try:
+                    self.set_path(key, value)
+                except ValueError:
+                    invalid_fields.append(key)
+        return invalid_fields
 
     def set_path(self, path: str, value: Any) -> None:
         target: Any = self
@@ -87,6 +95,8 @@ class ClaimState(BaseModel):
         leaf = parts[-1]
         if not hasattr(target, leaf):
             raise ValueError(f"Unknown claim field: {path}")
+        if path == "damage.items" and isinstance(value, str):
+            value = [item.strip() for item in value.split(",") if item.strip()]
         setattr(target, leaf, value)
 
     def get_path(self, path: str) -> Any:

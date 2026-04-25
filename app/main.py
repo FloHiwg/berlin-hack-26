@@ -40,6 +40,12 @@ def parse_args() -> argparse.Namespace:
         default=ROOT / "storage" / "sessions",
         help="Directory for session logs and claim JSON.",
     )
+    parser.add_argument(
+        "--transport",
+        choices=["auto", "live", "generate-content"],
+        default="auto",
+        help="Text transport. auto tries Live first, then falls back to generateContent.",
+    )
     return parser.parse_args()
 
 
@@ -52,6 +58,7 @@ async def async_main() -> None:
             playbook_path=args.playbook,
             storage_dir=args.storage_dir,
             eval_transcript=args.eval_transcript,
+            transport=args.transport,
         )
     except SessionFinished as exc:
         print(f"\nSession ended: {exc.reason}")

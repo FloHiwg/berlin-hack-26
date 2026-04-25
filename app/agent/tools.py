@@ -26,9 +26,13 @@ class ClaimToolHandlers:
         self.finished_reason: str | None = None
 
     def update_claim_state(self, claim_update: dict[str, Any]) -> dict[str, Any]:
-        self.claim_state.merge_update(claim_update)
+        invalid_fields = self.claim_state.merge_update(claim_update)
         self.claim_state.save(self.storage_dir)
-        return self._status("updated")
+        result = self._status("updated")
+        if invalid_fields:
+            result["ignored_fields"] = invalid_fields
+            result["status"] = "updated_with_ignored_fields"
+        return result
 
     def escalate(self, reason: str, risk_flags: list[str]) -> dict[str, Any]:
         self.claim_state.handoff_required = True

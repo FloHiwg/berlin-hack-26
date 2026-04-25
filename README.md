@@ -27,6 +27,8 @@ Then set:
 ```env
 GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-3.1-flash-live-preview
+GEMINI_TEXT_MODEL=gemini-2.5-flash
+GEMINI_API_VERSION=v1alpha
 ```
 
 ## Run
@@ -38,6 +40,15 @@ uv run python app/main.py --text-mode
 ```
 
 The agent prints a session ID, greets the customer, asks one question at a time, and saves progress after each structured state update.
+
+By default, `--transport auto` tries the Gemini Live model first, then falls back to `GEMINI_TEXT_MODEL` with the regular Gemini text API if Live rejects the session during setup. This keeps the Phase 1 terminal workflow testable even when the preview Live API returns setup-time `1008` or `1011` errors.
+
+Force one transport when debugging:
+
+```bash
+uv run python app/main.py --text-mode --transport live
+uv run python app/main.py --text-mode --transport generate-content
+```
 
 ## Eval Transcript Mode
 

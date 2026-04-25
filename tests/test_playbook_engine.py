@@ -46,3 +46,11 @@ def test_nested_and_dot_notation_updates_overwrite_values() -> None:
     claim.merge_update({"customer.full_name": "Smith"})
 
     assert claim.customer.full_name == "Smith"
+
+
+def test_damage_items_string_is_normalized_to_list() -> None:
+    claim = ClaimState(session_id="claim_test")
+
+    claim.merge_update({"damage.items": "bumper, trunk"})
+
+    assert claim.damage.items == ["bumper", "trunk"]
