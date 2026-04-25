@@ -1,5 +1,5 @@
 Necessary
-- [ ] Tool Calling
+- [x] Tool Calling
 - [ ] Record conversations: save full transcript (both sides) to `storage/sessions/<id>_transcript.txt` for every session
 - [ ] Latency logging: log time from end-of-speech to first agent audio chunk per turn to `storage/sessions/<id>_latency.
 - [ ] Switch to handle everything as a car accident by default
