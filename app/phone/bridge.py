@@ -27,8 +27,6 @@ from app.agent.session import (
 from app.agent.tools import ClaimToolHandlers, SessionFinished
 from app.claims.claim_state import ClaimState
 from app.claims.playbook_engine import PlaybookEngine
-from app.config import ambient_office_config
-from app.audio.ambient import AmbientLoopMixer
 from app.phone.audio import (
     resample_24k_to_8k,
     resample_8k_to_16k,
@@ -161,22 +159,6 @@ async def _twilio_send_loop(
     state: _StreamState,
 ) -> None:
     """Read Gemini audio from queue; resample, encode μ-law, send to Twilio."""
-    ambient_mixer: AmbientLoopMixer | None = None
-    ambient_cfg = ambient_office_config()
-    if ambient_cfg.enabled and ambient_cfg.gain > 0:
-        try:
-            ambient_mixer = AmbientLoopMixer.from_wav(
-                sample_rate=24000,
-                gain=ambient_cfg.gain,
-                wav_path=ambient_cfg.file_path,
-            )
-            print(
-                f"[twilio] office ambience enabled ({ambient_cfg.file_path}, gain={ambient_cfg.gain:.2f})",
-                flush=True,
-            )
-        except Exception as exc:
-            print(f"[twilio] office ambience disabled: {exc}", flush=True)
-
     while True:
         chunk = await audio_queue.get()
 
@@ -198,8 +180,6 @@ async def _twilio_send_loop(
 
         speaking_event.set()
         pcm_24k = np.frombuffer(chunk, dtype=np.int16)
-        if ambient_mixer is not None:
-            pcm_24k = ambient_mixer.mix(pcm_24k)
         pcm_8k = resample_24k_to_8k(pcm_24k)
         payload = base64.b64encode(ulaw_encode(pcm_8k)).decode()
         await ws.send_text(
