@@ -186,19 +186,27 @@ Rules:
             agent_question=agent_question,
             utterance=utterance,
         )
-        try:
-            response = await self.client.aio.models.generate_content(
-                model=self.model,
-                contents=prompt,
-            )
-            text = (response.text or "").strip()
-            if text.startswith("```"):
-                lines = text.splitlines()
-                end = -1 if lines[-1].strip() == "```" else len(lines)
-                text = "\n".join(lines[1:end])
-            return json.loads(text) if text else {}
-        except Exception:
-            return {}
+        for attempt in range(3):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                )
+                text = (response.text or "").strip()
+                if text.startswith("```"):
+                    lines = text.splitlines()
+                    end = -1 if lines[-1].strip() == "```" else len(lines)
+                    text = "\n".join(lines[1:end])
+                return json.loads(text) if text else {}
+            except Exception as e:
+                if "429" in str(e) and attempt < 2:
+                    wait = 2 ** attempt
+                    print(f"[extractor] rate limited, retrying in {wait}s", flush=True)
+                    await asyncio.sleep(wait)
+                else:
+                    print(f"[extractor] error: {e}", flush=True)
+                    return {}
+        return {}
 
 
 async def _run_extraction(
@@ -381,7 +389,7 @@ async def _run_voice_session(
     from app.audio.output import play_audio, FLUSH
 
     transcription_enabled = True
-    extractor_model = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+    extractor_model = os.getenv("GEMINI_EXTRACTOR_MODEL", "gemini-3-flash-preview")
     field_extractor = FieldExtractor(client, extractor_model)
 
     playbook_engine = PlaybookEngine.from_yaml(playbook_path)
