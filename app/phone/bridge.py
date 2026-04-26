@@ -39,7 +39,7 @@ from app.phone.audio import (
 _FLUSH = object()  # barge-in sentinel, mirrors FLUSH from audio/output.py
 _AMBIENT_FRAME_SECONDS = 0.10
 _AMBIENT_FRAME_SAMPLES_24K = int(24000 * _AMBIENT_FRAME_SECONDS)
-_PRE_GREETING_DELAY_SECONDS = 8
+_PRE_GREETING_DELAY_SECONDS = 0
 
 
 def _build_ambient_mixer() -> AmbientLoopMixer | None:
