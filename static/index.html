@@ -832,6 +832,17 @@
         /* Claim sections */
         .claim-sections { display: flex; flex-direction: column; gap: var(--sp-4); }
 
+        .claim-section-with-cta {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--sp-4);
+        }
+
+        .claim-section-with-cta > div:first-child {
+            flex: 1;
+        }
+
         .claim-section-title {
             font-family: var(--font-body);
             font-size: 10px;
@@ -1124,12 +1135,19 @@
 
             return `
                 <div class="claim-sections">
-                    ${filledSections.map(s => `
-                        <div>
-                            <div class="claim-section-title">${s.title}</div>
-                            <div class="claim-fields">
-                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                    ${filledSections.map((s, idx) => `
+                        <div class="${idx === 0 ? 'claim-section-with-cta' : ''}">
+                            <div>
+                                <div class="claim-section-title">${s.title}</div>
+                                <div class="claim-fields">
+                                    ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                                </div>
                             </div>
+                            ${idx === 0 ? `
+                                <a href="https://www.get-inca.com/" target="_blank" rel="noopener noreferrer" class="cta-button">
+                                    Start Case Processing
+                                </a>
+                            ` : ''}
                         </div>
                     `).join('')}
                 </div>
@@ -1617,12 +1635,6 @@
 
             detailView.innerHTML = `
                 <div class="session-card">
-                    <div class="session-header">
-                        <a href="https://www.get-inca.com/" target="_blank" rel="noopener noreferrer" class="cta-button">
-                            Start Case Processing
-                        </a>
-                    </div>
-
                     ${hasAudio ? `
                     <div class="audio-section">
                         <div class="section-label">Recording</div>
