@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -77,8 +78,21 @@ async def run_twilio_bridge(
     claim_state = ClaimState(session_id=new_session_id())
     claim_state.save(storage_dir)
     logger = TranscriptLogger(storage_dir, claim_state.session_id)
-    agent_recorder = AudioRecorder(storage_dir, claim_state.session_id, suffix="audio_agent", sample_rate=24000)
-    caller_recorder = AudioRecorder(storage_dir, claim_state.session_id, suffix="audio_caller", sample_rate=16000)
+    recording_started_at = time.monotonic()
+    agent_recorder = AudioRecorder(
+        storage_dir,
+        claim_state.session_id,
+        suffix="audio_agent",
+        sample_rate=24000,
+        start_time=recording_started_at,
+    )
+    caller_recorder = AudioRecorder(
+        storage_dir,
+        claim_state.session_id,
+        suffix="audio_caller",
+        sample_rate=16000,
+        start_time=recording_started_at,
+    )
     handlers = ClaimToolHandlers(claim_state, playbook_engine, storage_dir)
 
     print(f"[twilio] session {claim_state.session_id}", flush=True)
@@ -217,6 +231,8 @@ async def _twilio_send_loop(
 
         speaking_event.set()
         pcm_24k = np.frombuffer(chunk, dtype=np.int16)
+        if ambient_mixer is not None:
+            pcm_24k = ambient_mixer.mix(pcm_24k)
         pcm_8k = resample_24k_to_8k(pcm_24k)
         payload = base64.b64encode(ulaw_encode(pcm_8k)).decode()
         await ws.send_text(

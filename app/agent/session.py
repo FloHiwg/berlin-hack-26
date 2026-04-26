@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 import wave
 from datetime import UTC, datetime
 from pathlib import Path
@@ -106,17 +107,47 @@ def new_session_id() -> str:
 class AudioRecorder:
     """Records audio streams to WAV file for voice sessions."""
 
-    def __init__(self, storage_dir: Path, session_id: str, suffix: str = "audio", sample_rate: int = 24000) -> None:
+    def __init__(
+        self,
+        storage_dir: Path,
+        session_id: str,
+        suffix: str = "audio",
+        sample_rate: int = 24000,
+        start_time: float | None = None,
+    ) -> None:
         storage_dir.mkdir(parents=True, exist_ok=True)
         self.audio_path = storage_dir / f"{session_id}_{suffix}.wav"
         self.sample_rate = sample_rate
-        self.audio_chunks: list[bytes] = []
+        self.start_time = time.monotonic() if start_time is None else start_time
+        self.audio_chunks: list[tuple[int, bytes]] = []
+        self._next_sample = 0
         self.recording = True
 
     def add_chunk(self, audio_data: bytes) -> None:
         """Add audio chunk to recording buffer."""
-        if self.recording:
-            self.audio_chunks.append(audio_data)
+        if not self.recording or not audio_data:
+            return
+        elapsed_samples = round((time.monotonic() - self.start_time) * self.sample_rate)
+        start_sample = max(elapsed_samples, self._next_sample)
+        self.audio_chunks.append((start_sample, audio_data))
+        self._next_sample = start_sample + (len(audio_data) // 2)
+
+    def _render(self) -> "np.ndarray":
+        import numpy as np
+
+        if not self.audio_chunks:
+            return np.array([], dtype=np.int16)
+
+        total_samples = max(
+            max(start + (len(chunk) // 2) for start, chunk in self.audio_chunks),
+            round((time.monotonic() - self.start_time) * self.sample_rate),
+        )
+        audio_array = np.zeros(total_samples, dtype=np.int16)
+        for start, chunk in self.audio_chunks:
+            samples = np.frombuffer(chunk, dtype=np.int16)
+            end = min(start + len(samples), total_samples)
+            audio_array[start:end] = samples[: end - start]
+        return audio_array
 
     def save(self) -> None:
         """Save recorded audio to WAV file."""
@@ -125,13 +156,8 @@ class AudioRecorder:
 
         try:
             import wave
-            import numpy as np
 
-            # Combine all chunks
-            audio_bytes = b"".join(self.audio_chunks)
-
-            # Convert to numpy array (assuming 16-bit PCM)
-            audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
+            audio_array = self._render()
 
             # Save as WAV
             with wave.open(str(self.audio_path), "wb") as wav_file:
@@ -145,10 +171,10 @@ class AudioRecorder:
             print(f"\nWarning: Failed to save audio recording: {e}", flush=True)
 
     def to_array(self) -> "np.ndarray":
-        import numpy as np
         if not self.audio_chunks:
+            import numpy as np
             return np.array([], dtype=np.int16)
-        return np.frombuffer(b"".join(self.audio_chunks), dtype=np.int16)
+        return self._render()
 
     def stop(self) -> None:
         """Stop recording and save."""
@@ -466,8 +492,21 @@ async def _run_voice_session(
     claim_state = ClaimState(session_id=new_session_id())
     claim_state.save(storage_dir)
     logger = TranscriptLogger(storage_dir, claim_state.session_id)
-    agent_recorder = AudioRecorder(storage_dir, claim_state.session_id, suffix="audio_agent", sample_rate=24000)
-    caller_recorder = AudioRecorder(storage_dir, claim_state.session_id, suffix="audio_caller", sample_rate=16000)
+    recording_started_at = time.monotonic()
+    agent_recorder = AudioRecorder(
+        storage_dir,
+        claim_state.session_id,
+        suffix="audio_agent",
+        sample_rate=24000,
+        start_time=recording_started_at,
+    )
+    caller_recorder = AudioRecorder(
+        storage_dir,
+        claim_state.session_id,
+        suffix="audio_caller",
+        sample_rate=16000,
+        start_time=recording_started_at,
+    )
 
     print(f"Session ID: {claim_state.session_id}", flush=True)
     logger.log("session", {"session_id": claim_state.session_id, "mode": "voice"})

@@ -64,7 +64,10 @@ async def play_audio(
                 continue
             if speaking_event:
                 speaking_event.set()
-            await asyncio.to_thread(stream.write, np.frombuffer(chunk, dtype="int16"))
+            speech = np.frombuffer(chunk, dtype="int16")
+            if ambient_mixer is not None:
+                speech = ambient_mixer.mix(speech)
+            await asyncio.to_thread(stream.write, speech)
             if speaking_event and queue.empty():
                 await asyncio.sleep(_PLAYBACK_TAIL_SECONDS)
                 if queue.empty():
