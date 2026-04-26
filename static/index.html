@@ -174,7 +174,88 @@
         .session-detail-view { display: none; }
         .session-detail-view.active { display: block; }
 
-        /* ── Session card ── */
+        /* ── Sessions Table ── */
+        .sessions-table-container {
+            background: var(--surface-container-lowest);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            overflow: hidden;
+        }
+
+        .sessions-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .sessions-table thead {
+            background: var(--surface-container);
+        }
+
+        .sessions-table th {
+            padding: var(--sp-3) var(--sp-4);
+            text-align: left;
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+            border-bottom: 1px solid var(--outline-variant);
+        }
+
+        .session-row {
+            cursor: pointer;
+            transition: background-color 0.15s;
+            border-bottom: 1px solid var(--outline-variant);
+        }
+
+        .session-row:last-child {
+            border-bottom: none;
+        }
+
+        .session-row:hover {
+            background: var(--surface-container-low);
+        }
+
+        .sessions-table td {
+            padding: var(--sp-3) var(--sp-4);
+            font-family: var(--font-body);
+        }
+
+        .session-date-cell {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--on-surface);
+            white-space: nowrap;
+        }
+
+        .session-time-cell {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--on-surface-variant);
+            white-space: nowrap;
+            font-family: var(--font-mono);
+        }
+
+        .session-policy-cell {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--on-surface-variant);
+        }
+
+        .session-customer-cell {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--on-surface-variant);
+        }
+
+        .session-location-cell {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--on-surface-variant);
+        }
+
+        /* Legacy card styles (kept for detail view) */
         .session-card {
             background: var(--surface-container-lowest);
             border: 1px solid var(--outline-variant);
@@ -188,9 +269,14 @@
 
         .session-header {
             display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: var(--sp-3);
+            flex-direction: column;
+            gap: var(--sp-2);
+        }
+
+        .session-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-1);
         }
 
         .session-id {
@@ -202,10 +288,17 @@
         }
 
         .session-date {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--on-surface);
+            font-family: var(--font-body);
+        }
+
+        .session-detail {
             font-size: 13px;
             font-weight: 400;
             color: var(--on-surface-variant);
-            margin-top: 4px;
+            font-family: var(--font-body);
         }
 
         .session-stage {
@@ -348,6 +441,41 @@
             letter-spacing: 0.1em;
             text-transform: uppercase;
             color: var(--outline);
+            display: flex;
+            align-items: center;
+            gap: var(--sp-2);
+        }
+
+        .transcript-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-weight: 500;
+        }
+
+        .transcript-badge.gradium {
+            background: var(--primary-container);
+            color: var(--on-primary-container);
+        }
+
+        .transcript-badge.gemini {
+            background: var(--surface-variant);
+            color: var(--on-surface-variant);
+        }
+
+        .timestamp {
+            font-size: 11px;
+            color: var(--on-surface-variant);
+            font-family: var(--font-mono);
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            gap: 8px;
         }
 
         .close-conversation-btn {
@@ -559,8 +687,30 @@
         }
 
         /* ── Claim State Accordion ── */
-        .claim-accordion {
+        .claim-section {
             margin-top: var(--sp-4);
+        }
+
+        .claim-section-header {
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+            margin-bottom: var(--sp-3);
+        }
+
+        .claim-key-details {
+            padding: var(--sp-4);
+            background: var(--surface-container-lowest);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            margin-bottom: var(--sp-3);
+        }
+
+        .claim-accordion {
+            margin-top: var(--sp-3);
             border: 1px solid var(--outline-variant);
             border-radius: var(--r-xl);
             overflow: hidden;
@@ -748,7 +898,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Session Conversations</h1>
+            <h1>Inca Call Log Manager</h1>
             <div class="header-nav">
                 <button class="back-btn" id="backBtn" onclick="goBackToList()">
                     ← Back to sessions
@@ -763,7 +913,7 @@
                     type="text"
                     class="filter-input"
                     id="filterInput"
-                    placeholder="Search by session ID, stage, or date..."
+                    placeholder="Search by date, time, policy, customer, or location..."
                 />
                 <span class="filter-stats" id="filterStats"></span>
             </div>
@@ -804,6 +954,30 @@
             } catch (error) {
                 console.error('Error fetching events:', error);
                 return [];
+            }
+        }
+
+        async function fetchTranscript(sessionId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/transcript`);
+                if (!response.ok) {
+                    throw new Error('Transcript not available');
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Failed to fetch transcript:', error);
+                return null;
+            }
+        }
+
+        async function checkTranscriptStatus(sessionId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/transcript/status`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                return { gradium_available: false, gemini_available: false };
             }
         }
 
@@ -876,6 +1050,110 @@
                 inner = `<span class="claim-field-value">${escapeHtml(String(value))}</span>`;
             }
             return `<div class="claim-field"><div class="claim-field-label">${label}</div>${inner}</div>`;
+        }
+
+        function renderKeyClaimDetails(state) {
+            if (!state) return '<p class="claim-no-data">No claim data available.</p>';
+
+            const isFilled = v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+            const keyFields = [
+                { title: 'Customer', fields: [
+                    ['Policy number',    state.customer?.policy_number],
+                    ['Identity verified',state.customer?.identity_verified],
+                    ['Is policyholder',  state.customer?.is_policyholder],
+                ]},
+                { title: 'Incident', fields: [
+                    ['Date',        state.incident?.date],
+                    ['Time',        state.incident?.time],
+                    ['Location',    state.incident?.location],
+                    ['Description', state.incident?.description],
+                ]},
+            ];
+
+            const filledSections = keyFields
+                .map(s => ({ ...s, fields: s.fields.filter(([, v]) => isFilled(v)) }))
+                .filter(s => s.fields.length > 0);
+
+            if (filledSections.length === 0)
+                return '<p class="claim-no-data">No key claim details collected yet.</p>';
+
+            return `
+                <div class="claim-sections">
+                    ${filledSections.map(s => `
+                        <div>
+                            <div class="claim-section-title">${s.title}</div>
+                            <div class="claim-fields">
+                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderAdditionalClaimDetails(state) {
+            if (!state) return '<p class="claim-no-data">No additional data available.</p>';
+
+            const isFilled = v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+            const additionalFields = [
+                { title: 'Customer (Additional)', fields: [
+                    ['Name',             state.customer?.full_name],
+                    ['Date of birth',    state.customer?.date_of_birth],
+                    ['Contact method',   state.customer?.preferred_contact_method],
+                    ['Caller name',      state.customer?.caller_name],
+                    ['Relationship',     state.customer?.relationship_to_policyholder],
+                ]},
+                { title: 'Damage', fields: [
+                    ['Items',            Array.isArray(state.damage?.items) && state.damage.items.length ? state.damage.items.join(', ') : null],
+                    ['Description',      state.damage?.description],
+                    ['Estimated value',  state.damage?.estimated_value],
+                    ['Photos available', state.damage?.photos_available],
+                ]},
+                { title: 'Safety', fields: [
+                    ['Injuries',              state.safety?.injuries],
+                    ['Police report',         state.safety?.police_report],
+                    ['Police report details', state.safety?.police_report_details],
+                    ['Urgent risk',           state.safety?.urgent_risk],
+                ]},
+                { title: 'Third Parties', fields: [
+                    ['Involved',     state.third_parties?.involved],
+                    ['Details',      state.third_parties?.details],
+                    ['Witness info', state.third_parties?.witness_info],
+                ]},
+                { title: 'Services', fields: [
+                    ['Rental car needed',      state.services?.rental_car_needed],
+                    ['Rental car preference',  state.services?.rental_car_preference],
+                    ['Repair shop selected',   state.services?.repair_shop_selected],
+                    ['Repair shop preference', state.services?.repair_shop_preference],
+                ]},
+                { title: 'Documents', fields: [
+                    ['Photos',       state.documents?.photos],
+                    ['Receipts',     state.documents?.receipts],
+                    ['Police report',state.documents?.police_report],
+                ]},
+            ];
+
+            const filledSections = additionalFields
+                .map(s => ({ ...s, fields: s.fields.filter(([, v]) => isFilled(v)) }))
+                .filter(s => s.fields.length > 0);
+
+            if (filledSections.length === 0)
+                return '<p class="claim-no-data">No additional details collected yet.</p>';
+
+            return `
+                <div class="claim-sections">
+                    ${filledSections.map(s => `
+                        <div>
+                            <div class="claim-section-title">${s.title}</div>
+                            <div class="claim-fields">
+                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
         }
 
         function renderClaimState(state) {
@@ -955,6 +1233,69 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function formatTimestamp(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function renderGradiumTranscript(sessionId, container, transcript) {
+            const segments = transcript.segments || [];
+
+            if (segments.length === 0) {
+                container.innerHTML = '<div class="empty">No transcript segments</div>';
+                return;
+            }
+
+            const messagesHtml = segments.map((segment, idx) => {
+                const timestamp = formatTimestamp(segment.start_s || 0);
+
+                return `
+                    <div class="message" data-idx="${idx}">
+                        <div class="message-header">
+                            <span class="timestamp">${timestamp}</span>
+                        </div>
+                        <div class="message-wrapper">
+                            <div class="message-text">${escapeHtml(segment.text)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <div class="conversation-header">
+                    <div class="conversation-title">
+                        Conversation
+                        <span class="transcript-badge gradium">Gradium AI</span>
+                    </div>
+                </div>
+                ${messagesHtml}
+            `;
+        }
+
+        function renderGeminiTranscript(sessionId, container, transcriptText) {
+            // Use existing event-based rendering for Gemini
+            loadConversationFromEvents(sessionId, container);
+        }
+
+        let transcriptPollInterval = null;
+
+        function startTranscriptPolling(sessionId, container) {
+            if (transcriptPollInterval) {
+                clearInterval(transcriptPollInterval);
+            }
+
+            transcriptPollInterval = setInterval(async () => {
+                const status = await checkTranscriptStatus(sessionId);
+                if (status.gradium_available) {
+                    clearInterval(transcriptPollInterval);
+                    transcriptPollInterval = null;
+                    // Reload conversation with Gradium transcript
+                    await loadConversation(sessionId, container);
+                }
+            }, 5000); // Poll every 5 seconds
         }
 
         function getNoteForMessage(messageId) {
@@ -1039,80 +1380,105 @@
         }
 
         function renderSession(session) {
-            const artifacts = session.artifacts || {};
-            const stages = session.stages || [];
+            const state = session.state || {};
+            const customer = state.customer || {};
+            const incident = state.incident || {};
+
+            // Extract date and time separately
+            const dateObj = session.created_at ? new Date(session.created_at) : null;
+            const dateStr = dateObj ? dateObj.toLocaleDateString() : 'N/A';
+            const timeStr = dateObj ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+            const policyNumber = customer.policy_number || 'N/A';
+
+            // Try to get customer name from state, fallback to extracting from transcript
+            let customerName = customer.full_name || customer.caller_name || 'Unknown';
+
+            // Get location from incident
+            const location = incident.location || 'N/A';
 
             return `
-                <div class="session-card" data-session-id="${session.session_id}">
-                    <div class="session-header">
-                        <div>
-                            <div class="session-id">${session.session_id}</div>
-                            <div class="session-date">${formatDate(session.created_at)}</div>
-                            ${session.current_stage ? `<div style="margin-top: 8px;"><span class="session-stage">${session.current_stage}</span></div>` : ''}
-                            ${renderStages(stages)}
-                        </div>
-                    </div>
-                    <div class="artifacts">
-                        <span class="artifact ${artifacts.transcript ? 'available' : ''}">Transcript</span>
-                        <span class="artifact ${artifacts.audio ? 'available' : ''}">Audio</span>
-                        <span class="artifact ${artifacts.events ? 'available' : ''}">Events</span>
-                        <span class="artifact ${artifacts.claim ? 'available' : ''}">Claim</span>
-                    </div>
-                </div>
+                <tr class="session-row" data-session-id="${session.session_id}">
+                    <td class="session-date-cell">${dateStr}</td>
+                    <td class="session-time-cell">${timeStr}</td>
+                    <td class="session-policy-cell">${escapeHtml(policyNumber)}</td>
+                    <td class="session-customer-cell">${escapeHtml(customerName)}</td>
+                    <td class="session-location-cell">${escapeHtml(location)}</td>
+                </tr>
             `;
+        }
+
+        async function loadConversationFromEvents(sessionId, container) {
+            const events = await fetchEvents(sessionId);
+
+            const messages = events.filter(e =>
+                (e.role === 'user' || e.role === 'agent' || e.role === 'model') &&
+                (e.content || e.text) &&
+                e.role !== 'system'
+            );
+
+            // Group consecutive messages from the same actor into one bubble
+            const groups = [];
+            for (const msg of messages) {
+                const text = msg.content || msg.text || '';
+                const last = groups[groups.length - 1];
+                if (last && last.role === msg.role) {
+                    last.texts.push(text);
+                } else {
+                    groups.push({ role: msg.role, texts: [text] });
+                }
+            }
+
+            console.log('Filtered messages:', messages.length, '→', groups.length, 'groups');
+
+            const messagesHtml = groups.length === 0
+                ? '<div style="padding: 20px; text-align: center; color: var(--outline);">No messages in this session</div>'
+                : groups.map((group, idx) => renderMessage(group, idx, sessionId)).join('');
+
+            const header = container.querySelector('.conversation-header');
+            container.innerHTML = '';
+            if (header) {
+                container.appendChild(header);
+            } else {
+                container.innerHTML = `
+                    <div class="conversation-header">
+                        <div class="conversation-title">
+                            Conversation
+                            <span class="transcript-badge gemini">Gemini Live</span>
+                        </div>
+                        <button class="close-conversation-btn" onclick="closeConversation('${sessionId}')">Close ✕</button>
+                    </div>
+                `;
+            }
+            const messagesDiv = document.createElement('div');
+            messagesDiv.innerHTML = messagesHtml;
+            container.appendChild(messagesDiv);
         }
 
         async function loadConversation(sessionId, container) {
             try {
-                const events = await fetchEvents(sessionId);
+                container.innerHTML = '<div class="loading">Loading conversation…</div>';
 
-                const messages = events.filter(e =>
-                    (e.role === 'user' || e.role === 'agent' || e.role === 'model') &&
-                    (e.content || e.text) &&
-                    e.role !== 'system'
-                );
+                // Fetch transcript (Gradium or Gemini)
+                const transcriptData = await fetchTranscript(sessionId);
 
-                // Group consecutive messages from the same actor into one bubble
-                const groups = [];
-                for (const msg of messages) {
-                    const text = msg.content || msg.text || '';
-                    const last = groups[groups.length - 1];
-                    if (last && last.role === msg.role) {
-                        last.texts.push(text);
-                    } else {
-                        groups.push({ role: msg.role, texts: [text] });
-                    }
+                if (!transcriptData) {
+                    container.innerHTML = '<div class="error">No transcript available</div>';
+                    return;
                 }
 
-                console.log('Filtered messages:', messages.length, '→', groups.length, 'groups');
-
-                const messagesHtml = groups.length === 0
-                    ? '<div style="padding: 20px; text-align: center; color: var(--outline);">No messages in this session</div>'
-                    : groups.map((group, idx) => renderMessage(group, idx, sessionId)).join('');
-
-                const header = container.querySelector('.conversation-header');
-                container.innerHTML = '';
-                if (header) {
-                    container.appendChild(header);
+                if (transcriptData.type === 'gradium' && transcriptData.format === 'json') {
+                    // Render Gradium transcript with timestamps
+                    renderGradiumTranscript(sessionId, container, transcriptData.transcript);
                 } else {
-                    container.innerHTML = `
-                        <div class="conversation-header">
-                            <div class="conversation-title">Conversation</div>
-                            <button class="close-conversation-btn" onclick="closeConversation('${sessionId}')">Close ✕</button>
-                        </div>
-                    `;
+                    // Render Gemini transcript (existing logic)
+                    await loadConversationFromEvents(sessionId, container);
+                    // Start polling for Gradium completion
+                    startTranscriptPolling(sessionId, container);
                 }
-                const messagesDiv = document.createElement('div');
-                messagesDiv.innerHTML = messagesHtml;
-                container.appendChild(messagesDiv);
             } catch (error) {
-                const header = container.querySelector('.conversation-header');
-                container.innerHTML = '';
-                if (header) container.appendChild(header);
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error';
-                errorDiv.textContent = `Failed to load conversation: ${error.message}`;
-                container.appendChild(errorDiv);
+                container.innerHTML = '<div class="error">Error loading conversation</div>';
+                console.error('Error loading conversation:', error);
             }
         }
 
@@ -1124,11 +1490,25 @@
                 filteredSessions = allSessions;
             } else {
                 const lowerQuery = query.toLowerCase();
-                filteredSessions = allSessions.filter(session =>
-                    session.session_id.toLowerCase().includes(lowerQuery) ||
-                    (session.current_stage && session.current_stage.toLowerCase().includes(lowerQuery)) ||
-                    (session.created_at && session.created_at.toLowerCase().includes(lowerQuery))
-                );
+                filteredSessions = allSessions.filter(session => {
+                    const state = session.state || {};
+                    const customer = state.customer || {};
+                    const incident = state.incident || {};
+
+                    // Extract searchable fields
+                    const dateStr = session.created_at ? new Date(session.created_at).toLocaleDateString().toLowerCase() : '';
+                    const timeStr = session.created_at ? new Date(session.created_at).toLocaleTimeString().toLowerCase() : '';
+                    const policyNumber = (customer.policy_number || '').toLowerCase();
+                    const customerName = (customer.full_name || customer.caller_name || '').toLowerCase();
+                    const location = (incident.location || '').toLowerCase();
+
+                    // Search only in displayed columns
+                    return dateStr.includes(lowerQuery) ||
+                           timeStr.includes(lowerQuery) ||
+                           policyNumber.includes(lowerQuery) ||
+                           customerName.includes(lowerQuery) ||
+                           location.includes(lowerQuery);
+                });
             }
             updateFilterStats();
             renderSessionsList();
@@ -1145,14 +1525,31 @@
                 content.innerHTML = '<div class="no-sessions">No sessions match your filter.</div>';
                 return;
             }
-            content.innerHTML = `<div class="sessions-list">${filteredSessions.map(renderSession).join('')}</div>`;
+            content.innerHTML = `
+                <div class="sessions-table-container">
+                    <table class="sessions-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Policy Number</th>
+                                <th>Customer Name</th>
+                                <th>Location</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredSessions.map(renderSession).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
             attachSessionClickHandlers();
         }
 
         function attachSessionClickHandlers() {
-            document.querySelectorAll('.session-card').forEach(card => {
-                card.addEventListener('click', async () => {
-                    await showSessionDetail(card.dataset.sessionId);
+            document.querySelectorAll('.session-row').forEach(row => {
+                row.addEventListener('click', async () => {
+                    await showSessionDetail(row.dataset.sessionId);
                 });
             });
         }
@@ -1165,6 +1562,9 @@
 
             const session = allSessions.find(s => s.session_id === sessionId);
             if (!session) return;
+
+            // Update page title
+            document.querySelector('h1').textContent = `Detail view ${sessionId}`;
 
             const detailView = document.getElementById('detailView');
             const sid = session.session_id;
@@ -1190,23 +1590,33 @@
                     ` : ''}
 
                     ${hasClaim ? `
-                    <div class="claim-accordion">
-                        <button class="claim-accordion-btn" onclick="toggleClaimBody('${sid}')">
-                            <span class="claim-accordion-label">Claim State</span>
-                            <svg class="claim-accordion-chevron" id="claim-icon-${sid}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                        <div class="claim-accordion-body" id="claim-body-${sid}">
-                            <div class="claim-split">
-                                <div>
-                                    <div class="claim-col-header">Structured</div>
-                                    ${renderClaimState(session.state)}
-                                </div>
-                                <div>
-                                    <div class="claim-col-header">Raw JSON</div>
-                                    <div class="claim-raw-panel">
-                                        <pre>${colorizeJson(session.state)}</pre>
+                    <div class="claim-section">
+                        <div class="claim-section-header">Claim State</div>
+
+                        <!-- Always visible key details -->
+                        <div class="claim-key-details">
+                            ${renderKeyClaimDetails(session.state)}
+                        </div>
+
+                        <!-- Expandable additional details -->
+                        <div class="claim-accordion">
+                            <button class="claim-accordion-btn" onclick="toggleClaimBody('${sid}')">
+                                <span class="claim-accordion-label">Additional Details & Raw JSON</span>
+                                <svg class="claim-accordion-chevron" id="claim-icon-${sid}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <div class="claim-accordion-body" id="claim-body-${sid}">
+                                <div class="claim-split">
+                                    <div>
+                                        <div class="claim-col-header">Additional Fields</div>
+                                        ${renderAdditionalClaimDetails(session.state)}
+                                    </div>
+                                    <div>
+                                        <div class="claim-col-header">Raw JSON</div>
+                                        <div class="claim-raw-panel">
+                                            <pre>${colorizeJson(session.state)}</pre>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1230,7 +1640,10 @@
             document.getElementById('mainView').style.display = 'block';
             document.getElementById('detailView').classList.remove('active');
             document.getElementById('backBtn').classList.remove('visible');
-            setSessionInUrl(null);
+            // Reset page title and set main URL
+            document.querySelector('h1').textContent = 'Inca Call Log Manager';
+            // Set URL to /main
+            window.history.pushState({}, '', '/main');
         }
 
         async function init() {
@@ -1256,7 +1669,12 @@
                 }
 
                 const urlSessionId = getSessionIdFromUrl();
-                if (urlSessionId) await showSessionDetail(urlSessionId);
+                if (urlSessionId) {
+                    await showSessionDetail(urlSessionId);
+                } else {
+                    // Set URL to /main when on list view
+                    window.history.replaceState({}, '', '/main');
+                }
             } catch (error) {
                 content.innerHTML = `<div class="error">Failed to load sessions: ${error.message}</div>`;
             }
