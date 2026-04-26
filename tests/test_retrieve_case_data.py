@@ -108,6 +108,66 @@ def test_retrieve_case_data_tool_via_dispatch(playbook_engine):
         assert claim_state.claim_type == "home_damage"
 
 
+def test_end_call_tool_via_dispatch_marks_session_finished(playbook_engine):
+    """Test that end_call terminates the session and persists risk context."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        storage_dir = Path(tmpdir)
+
+        claim_state = ClaimState(session_id="test_end_call")
+        handlers = ClaimToolHandlers(claim_state, playbook_engine, storage_dir)
+
+        result = handlers.dispatch(
+            "end_call",
+            {"reason": "Caller requested human help", "risk_flags": ["human_handoff"]},
+        )
+
+        assert result["status"] == "ended"
+        assert handlers.finished_reason == "ended"
+        assert claim_state.handoff_required is True
+        assert claim_state.risk_flags == ["human_handoff"]
+        assert claim_state.completed_at is not None
+        assert (storage_dir / "test_end_call_claim.json").exists()
+
+
+def test_finalize_claim_does_not_end_call(playbook_engine):
+    """Test that finalize_claim completes the claim but leaves room for goodbye."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        storage_dir = Path(tmpdir)
+
+        claim_state = ClaimState(session_id="test_finalize")
+        claim_state.merge_update(
+            {
+                "customer.identity_verified": True,
+                "customer.is_policyholder": True,
+                "claim_type": "auto accident",
+                "incident.date": "2026-04-20",
+                "incident.location": "Berlin",
+                "incident.time": "09:00",
+                "incident.description": "Rear-end collision",
+                "damage.items": ["rear bumper"],
+                "third_parties.involved": False,
+                "safety.injuries": False,
+                "safety.urgent_risk": False,
+                "safety.police_report": False,
+                "damage.description": "Scratched rear bumper",
+                "damage.estimated_value": "unknown",
+                "damage.photos_available": True,
+                "services.rental_car_needed": False,
+                "services.repair_shop_selected": False,
+                "documents.photos": True,
+                "documents.receipts": False,
+                "documents.police_report": False,
+            }
+        )
+        handlers = ClaimToolHandlers(claim_state, playbook_engine, storage_dir)
+
+        result = handlers.dispatch("finalize_claim", {})
+
+        assert result["status"] == "finalized"
+        assert handlers.finished_reason is None
+        assert claim_state.completed_at is not None
+
+
 def test_update_case_status_valid(playbook_engine):
     """Test updating case status with a valid status value."""
     with tempfile.TemporaryDirectory() as tmpdir:

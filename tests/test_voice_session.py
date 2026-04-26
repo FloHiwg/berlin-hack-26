@@ -148,7 +148,7 @@ def test_merge_audio_recordings_keeps_stream_offsets(tmp_path) -> None:
 
 
 @pytest.mark.anyio
-async def test_play_audio_mixes_ambient_under_speech(monkeypatch) -> None:
+async def test_play_audio_keeps_ambient_alive_after_speech_chunk(monkeypatch) -> None:
     writes: list[np.ndarray] = []
 
     class _FakeStream:
@@ -174,15 +174,17 @@ async def test_play_audio_mixes_ambient_under_speech(monkeypatch) -> None:
             audio_loop=np.array([5, 6], dtype=np.int16),
         ),
     )
+    monkeypatch.setattr(output_mod, "_PLAYBACK_TAIL_SECONDS", 0.15)
 
     queue: asyncio.Queue = asyncio.Queue()
     await queue.put(np.array([10, 20], dtype=np.int16).tobytes())
 
     task = asyncio.create_task(output_mod.play_audio(queue))
-    while not writes:
+    while len(writes) < 2:
         await asyncio.sleep(0)
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await task
 
     assert writes[0].tolist() == [15, 26]
+    assert writes[1][:4].tolist() == [5, 6, 5, 6]

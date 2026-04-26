@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import numpy as np
 import sounddevice as sd
@@ -32,6 +33,30 @@ def _build_ambient_mixer() -> AmbientLoopMixer | None:
         return None
 
 
+async def _write_ambient_frame(stream: sd.RawOutputStream, ambient_mixer: AmbientLoopMixer) -> None:
+    ambient_only = ambient_mixer.mix(np.zeros(_AMBIENT_FRAME_SAMPLES, dtype=np.int16))
+    await asyncio.to_thread(stream.write, ambient_only)
+
+
+async def _keep_ambient_alive_during_tail(
+    queue: asyncio.Queue,
+    stream: sd.RawOutputStream,
+    ambient_mixer: AmbientLoopMixer | None,
+) -> object | None:
+    deadline = time.monotonic() + _PLAYBACK_TAIL_SECONDS
+    while queue.empty():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        if ambient_mixer is None:
+            try:
+                return await asyncio.wait_for(queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return None
+        await _write_ambient_frame(stream, ambient_mixer)
+    return await queue.get()
+
+
 async def play_audio(
     queue: asyncio.Queue,
     speaking_event: asyncio.Event | None = None,
@@ -40,16 +65,20 @@ async def play_audio(
     ambient_mixer = _build_ambient_mixer()
     stream = sd.RawOutputStream(samplerate=_SAMPLE_RATE, channels=1, dtype="int16")
     stream.start()
+    pending_chunk: object | None = None
     try:
         while True:
-            try:
-                chunk = await asyncio.wait_for(queue.get(), timeout=_AMBIENT_FRAME_SECONDS)
-            except asyncio.TimeoutError:
-                if ambient_mixer is None:
+            if pending_chunk is None:
+                try:
+                    chunk = await asyncio.wait_for(queue.get(), timeout=_AMBIENT_FRAME_SECONDS)
+                except asyncio.TimeoutError:
+                    if ambient_mixer is None:
+                        continue
+                    await _write_ambient_frame(stream, ambient_mixer)
                     continue
-                ambient_only = ambient_mixer.mix(np.zeros(_AMBIENT_FRAME_SAMPLES, dtype=np.int16))
-                await asyncio.to_thread(stream.write, ambient_only)
-                continue
+            else:
+                chunk = pending_chunk
+                pending_chunk = None
             if chunk is FLUSH:
                 # Drain any audio chunks that arrived before the interrupt signal.
                 while not queue.empty():
@@ -69,8 +98,8 @@ async def play_audio(
                 speech = ambient_mixer.mix(speech)
             await asyncio.to_thread(stream.write, speech)
             if speaking_event and queue.empty():
-                await asyncio.sleep(_PLAYBACK_TAIL_SECONDS)
-                if queue.empty():
+                pending_chunk = await _keep_ambient_alive_during_tail(queue, stream, ambient_mixer)
+                if pending_chunk is None:
                     speaking_event.clear()
     finally:
         if speaking_event:

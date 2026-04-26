@@ -40,6 +40,7 @@ from app.phone.audio import (
 _FLUSH = object()  # barge-in sentinel, mirrors FLUSH from audio/output.py
 _AMBIENT_FRAME_SECONDS = 0.10
 _AMBIENT_FRAME_SAMPLES_24K = int(24000 * _AMBIENT_FRAME_SECONDS)
+_PLAYBACK_TAIL_SECONDS = 0.10
 _PRE_GREETING_DELAY_SECONDS = 8
 
 
@@ -197,21 +198,47 @@ async def _twilio_send_loop(
 ) -> None:
     """Read Gemini audio from queue; resample, encode μ-law, send to Twilio."""
     ambient_mixer = _build_ambient_mixer()
-    while True:
-        try:
-            chunk = await asyncio.wait_for(audio_queue.get(), timeout=_AMBIENT_FRAME_SECONDS)
-        except asyncio.TimeoutError:
-            if not state.stream_sid or ambient_mixer is None:
-                continue
-            ambient_only_24k = ambient_mixer.mix(np.zeros(_AMBIENT_FRAME_SAMPLES_24K, dtype=np.int16))
-            ambient_only_8k = resample_24k_to_8k(ambient_only_24k)
-            ambient_payload = base64.b64encode(ulaw_encode(ambient_only_8k)).decode()
-            await ws.send_text(
-                json.dumps(
-                    {"event": "media", "streamSid": state.stream_sid, "media": {"payload": ambient_payload}}
-                )
+    pending_chunk: object | None = None
+
+    async def _send_pcm_24k(pcm_24k: np.ndarray) -> None:
+        pcm_8k = resample_24k_to_8k(pcm_24k)
+        payload = base64.b64encode(ulaw_encode(pcm_8k)).decode()
+        await ws.send_text(
+            json.dumps(
+                {"event": "media", "streamSid": state.stream_sid, "media": {"payload": payload}}
             )
-            continue
+        )
+
+    async def _send_ambient_frame() -> None:
+        if not state.stream_sid or ambient_mixer is None:
+            return
+        ambient_only_24k = ambient_mixer.mix(np.zeros(_AMBIENT_FRAME_SAMPLES_24K, dtype=np.int16))
+        await _send_pcm_24k(ambient_only_24k)
+
+    async def _keep_ambient_alive_during_tail() -> object | None:
+        deadline = time.monotonic() + _PLAYBACK_TAIL_SECONDS
+        while audio_queue.empty():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return None
+            if not state.stream_sid or ambient_mixer is None:
+                try:
+                    return await asyncio.wait_for(audio_queue.get(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    return None
+            await _send_ambient_frame()
+        return await audio_queue.get()
+
+    while True:
+        if pending_chunk is None:
+            try:
+                chunk = await asyncio.wait_for(audio_queue.get(), timeout=_AMBIENT_FRAME_SECONDS)
+            except asyncio.TimeoutError:
+                await _send_ambient_frame()
+                continue
+        else:
+            chunk = pending_chunk
+            pending_chunk = None
 
         if chunk is _FLUSH:
             while not audio_queue.empty():
@@ -233,15 +260,9 @@ async def _twilio_send_loop(
         pcm_24k = np.frombuffer(chunk, dtype=np.int16)
         if ambient_mixer is not None:
             pcm_24k = ambient_mixer.mix(pcm_24k)
-        pcm_8k = resample_24k_to_8k(pcm_24k)
-        payload = base64.b64encode(ulaw_encode(pcm_8k)).decode()
-        await ws.send_text(
-            json.dumps(
-                {"event": "media", "streamSid": state.stream_sid, "media": {"payload": payload}}
-            )
-        )
+        await _send_pcm_24k(pcm_24k)
 
         if audio_queue.empty():
-            await asyncio.sleep(0.1)
-            if audio_queue.empty():
+            pending_chunk = await _keep_ambient_alive_during_tail()
+            if pending_chunk is None:
                 speaking_event.clear()

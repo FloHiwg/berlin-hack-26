@@ -22,9 +22,9 @@ update_claim_state_tool = types.FunctionDeclaration(
     ),
 )
 
-escalate_tool = types.FunctionDeclaration(
-    name="escalate",
-    description="Call when urgent risk, injury, or human handoff is required.",
+end_call_tool = types.FunctionDeclaration(
+    name="end_call",
+    description="Call when the conversation should be ended, including urgent risk, injury, human handoff, misuse, or caller request to stop.",
     parameters=types.Schema(
         type=_schema_type("OBJECT"),
         properties={
@@ -82,7 +82,7 @@ tools = [
             retrieve_case_data_tool,
             update_case_status_tool,
             update_claim_state_tool,
-            escalate_tool,
+            end_call_tool,
             finalize_claim_tool,
         ]
     )

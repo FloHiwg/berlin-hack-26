@@ -41,20 +41,22 @@ class ClaimToolHandlers:
             result["status"] = "updated_with_ignored_fields"
         return result
 
-    def escalate(self, reason: str, risk_flags: list[str]) -> dict[str, Any]:
-        self.claim_state.handoff_required = True
+    def end_call(self, reason: str, risk_flags: list[str] | None = None) -> dict[str, Any]:
+        risk_flags = risk_flags or []
+        if risk_flags:
+            self.claim_state.handoff_required = True
         for flag in risk_flags:
             if flag not in self.claim_state.risk_flags:
                 self.claim_state.risk_flags.append(flag)
         self.claim_state.mark_completed()
         self.claim_state.save(self.storage_dir)
         print(
-            "\nESCALATION: A human claims specialist is required."
+            "\nCALL ENDED."
             f"\nReason: {reason}\n",
             flush=True,
         )
-        self.finished_reason = "escalated"
-        return self._status("escalated")
+        self.finished_reason = "ended"
+        return self._status("ended")
 
     def finalize_claim(self) -> dict[str, Any]:
         missing = self.playbook_engine.get_missing_fields(self.claim_state)
@@ -62,7 +64,6 @@ class ClaimToolHandlers:
             return self._status("missing_required_fields")
         self.claim_state.mark_completed()
         self.claim_state.save(self.storage_dir)
-        self.finished_reason = "finalized"
         return self._status("finalized")
 
     def retrieve_case_data(
@@ -130,9 +131,9 @@ class ClaimToolHandlers:
             return self.update_case_status(new_status=args.get("new_status", ""))
         if name == "update_claim_state":
             return self.update_claim_state(args.get("claim_update", {}))
-        if name == "escalate":
-            return self.escalate(
-                reason=args.get("reason", "Escalation requested"),
+        if name == "end_call":
+            return self.end_call(
+                reason=args.get("reason", "Call ended"),
                 risk_flags=list(args.get("risk_flags", [])),
             )
         if name == "finalize_claim":
