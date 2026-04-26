@@ -108,16 +108,10 @@ async def run_twilio_bridge(
         async with client.aio.live.connect(model=model, config=config) as session:
             # Safety delay so the agent does not greet immediately if Twilio intro audio is skipped.
             await asyncio.sleep(_PRE_GREETING_DELAY_SECONDS)
-            await send_live_text(
-                session,
-                (
-                    "Begin the call now. Open with the EXACT scripted greeting from your "
-                    'system instructions ("Hello, this is Lisa from National Insurance '
-                    'emergency hotline. What happened?") and wait for the caller\'s response.'
-                ),
-            )
-            logger.log("control", "Lisa opening greeting requested")
 
+            # Start receiver/sender tasks before sending the greeting so audio chunks from
+            # Gemini's response are never dropped while stream_sid or the queue consumer
+            # are not yet running (mirrors the on-device session ordering).
             gemini_receive = asyncio.create_task(
                 _receive_voice_loop(
                     session, handlers, logger, gemini_audio_queue, _FLUSH,
@@ -130,6 +124,20 @@ async def run_twilio_bridge(
             twilio_send = asyncio.create_task(
                 _twilio_send_loop(ws, gemini_audio_queue, speaking_event, stream_state)
             )
+
+            # Yield once so tasks can initialize (e.g. twilio_receive sets stream_sid)
+            # before Gemini starts generating audio for the greeting.
+            await asyncio.sleep(0)
+
+            await send_live_text(
+                session,
+                (
+                    "Begin the call now. Open with the EXACT scripted greeting from your "
+                    'system instructions ("Hello, this is Lisa from National Insurance '
+                    'emergency hotline. What happened?") and wait for the caller\'s response.'
+                ),
+            )
+            logger.log("control", "Lisa opening greeting requested")
 
             done, pending = await asyncio.wait(
                 {gemini_receive, twilio_receive, twilio_send},
