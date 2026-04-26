@@ -33,6 +33,15 @@ class ClaimToolHandlers:
         self.finished_reason: str | None = None
 
     def update_claim_state(self, claim_update: dict[str, Any]) -> dict[str, Any]:
+        # Check if policy number is being set
+        policy_number = claim_update.get("policyholder.policy_number")
+        if policy_number and not self.claim_state.policyholder.customer_profile.membership_since:
+            # Auto-fetch customer profile when policy number is first set
+            from app.claims.customer_data import generate_customer_profile
+
+            profile_data = generate_customer_profile(policy_number)
+            claim_update["policyholder.customer_profile.membership_since"] = profile_data["membership_since"]
+
         invalid_fields = self.claim_state.merge_update(claim_update)
         self.claim_state.save(self.storage_dir)
         result = self._status("updated")
@@ -89,6 +98,14 @@ class ClaimToolHandlers:
             "third_parties.involved": case_data.get("third_party_involved"),
             "third_parties.details": case_data.get("third_party_details"),
         }
+
+        # Check if policy number is being set and auto-fetch customer profile
+        policy_number = case_update.get("policyholder.policy_number")
+        if policy_number and not self.claim_state.policyholder.customer_profile.membership_since:
+            from app.claims.customer_data import generate_customer_profile
+
+            profile_data = generate_customer_profile(policy_number)
+            case_update["policyholder.customer_profile.membership_since"] = profile_data["membership_since"]
 
         # Update state, ignoring None values
         invalid_fields = self.claim_state.merge_update(case_update)
