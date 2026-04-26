@@ -12,7 +12,7 @@ Nice to have
 - [ ] Add functionality that someone who already called within the last 10 mins with the same number can continue his last conversation with a natural pick like "did we lost our connection? No worries lets continue"
 - [ ] Add background audio to simulate office background noice
 - [x] Add a jingle in the beginning with the question to press 1 if you have an emergency
-    - [ ] Beep missing after the jingle
+    - [x] Beep missing after the jingle
 - [ ] Add handling of session cancellations
 
 - [ ] Connect to insurance database
