@@ -687,8 +687,30 @@
         }
 
         /* ── Claim State Accordion ── */
-        .claim-accordion {
+        .claim-section {
             margin-top: var(--sp-4);
+        }
+
+        .claim-section-header {
+            font-family: var(--font-body);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--outline);
+            margin-bottom: var(--sp-3);
+        }
+
+        .claim-key-details {
+            padding: var(--sp-4);
+            background: var(--surface-container-lowest);
+            border: 1px solid var(--outline-variant);
+            border-radius: var(--r-xl);
+            margin-bottom: var(--sp-3);
+        }
+
+        .claim-accordion {
+            margin-top: var(--sp-3);
             border: 1px solid var(--outline-variant);
             border-radius: var(--r-xl);
             overflow: hidden;
@@ -1028,6 +1050,110 @@
                 inner = `<span class="claim-field-value">${escapeHtml(String(value))}</span>`;
             }
             return `<div class="claim-field"><div class="claim-field-label">${label}</div>${inner}</div>`;
+        }
+
+        function renderKeyClaimDetails(state) {
+            if (!state) return '<p class="claim-no-data">No claim data available.</p>';
+
+            const isFilled = v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+            const keyFields = [
+                { title: 'Customer', fields: [
+                    ['Policy number',    state.customer?.policy_number],
+                    ['Identity verified',state.customer?.identity_verified],
+                    ['Is policyholder',  state.customer?.is_policyholder],
+                ]},
+                { title: 'Incident', fields: [
+                    ['Date',        state.incident?.date],
+                    ['Time',        state.incident?.time],
+                    ['Location',    state.incident?.location],
+                    ['Description', state.incident?.description],
+                ]},
+            ];
+
+            const filledSections = keyFields
+                .map(s => ({ ...s, fields: s.fields.filter(([, v]) => isFilled(v)) }))
+                .filter(s => s.fields.length > 0);
+
+            if (filledSections.length === 0)
+                return '<p class="claim-no-data">No key claim details collected yet.</p>';
+
+            return `
+                <div class="claim-sections">
+                    ${filledSections.map(s => `
+                        <div>
+                            <div class="claim-section-title">${s.title}</div>
+                            <div class="claim-fields">
+                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function renderAdditionalClaimDetails(state) {
+            if (!state) return '<p class="claim-no-data">No additional data available.</p>';
+
+            const isFilled = v => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0);
+
+            const additionalFields = [
+                { title: 'Customer (Additional)', fields: [
+                    ['Name',             state.customer?.full_name],
+                    ['Date of birth',    state.customer?.date_of_birth],
+                    ['Contact method',   state.customer?.preferred_contact_method],
+                    ['Caller name',      state.customer?.caller_name],
+                    ['Relationship',     state.customer?.relationship_to_policyholder],
+                ]},
+                { title: 'Damage', fields: [
+                    ['Items',            Array.isArray(state.damage?.items) && state.damage.items.length ? state.damage.items.join(', ') : null],
+                    ['Description',      state.damage?.description],
+                    ['Estimated value',  state.damage?.estimated_value],
+                    ['Photos available', state.damage?.photos_available],
+                ]},
+                { title: 'Safety', fields: [
+                    ['Injuries',              state.safety?.injuries],
+                    ['Police report',         state.safety?.police_report],
+                    ['Police report details', state.safety?.police_report_details],
+                    ['Urgent risk',           state.safety?.urgent_risk],
+                ]},
+                { title: 'Third Parties', fields: [
+                    ['Involved',     state.third_parties?.involved],
+                    ['Details',      state.third_parties?.details],
+                    ['Witness info', state.third_parties?.witness_info],
+                ]},
+                { title: 'Services', fields: [
+                    ['Rental car needed',      state.services?.rental_car_needed],
+                    ['Rental car preference',  state.services?.rental_car_preference],
+                    ['Repair shop selected',   state.services?.repair_shop_selected],
+                    ['Repair shop preference', state.services?.repair_shop_preference],
+                ]},
+                { title: 'Documents', fields: [
+                    ['Photos',       state.documents?.photos],
+                    ['Receipts',     state.documents?.receipts],
+                    ['Police report',state.documents?.police_report],
+                ]},
+            ];
+
+            const filledSections = additionalFields
+                .map(s => ({ ...s, fields: s.fields.filter(([, v]) => isFilled(v)) }))
+                .filter(s => s.fields.length > 0);
+
+            if (filledSections.length === 0)
+                return '<p class="claim-no-data">No additional details collected yet.</p>';
+
+            return `
+                <div class="claim-sections">
+                    ${filledSections.map(s => `
+                        <div>
+                            <div class="claim-section-title">${s.title}</div>
+                            <div class="claim-fields">
+                                ${s.fields.map(([label, value]) => renderClaimField(label, value)).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
         }
 
         function renderClaimState(state) {
@@ -1437,6 +1563,9 @@
             const session = allSessions.find(s => s.session_id === sessionId);
             if (!session) return;
 
+            // Update page title
+            document.querySelector('h1').textContent = `Detail view ${sessionId}`;
+
             const detailView = document.getElementById('detailView');
             const sid = session.session_id;
             const hasAudio = session.artifacts?.audio;
@@ -1461,23 +1590,33 @@
                     ` : ''}
 
                     ${hasClaim ? `
-                    <div class="claim-accordion">
-                        <button class="claim-accordion-btn" onclick="toggleClaimBody('${sid}')">
-                            <span class="claim-accordion-label">Claim State</span>
-                            <svg class="claim-accordion-chevron" id="claim-icon-${sid}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                        </button>
-                        <div class="claim-accordion-body" id="claim-body-${sid}">
-                            <div class="claim-split">
-                                <div>
-                                    <div class="claim-col-header">Structured</div>
-                                    ${renderClaimState(session.state)}
-                                </div>
-                                <div>
-                                    <div class="claim-col-header">Raw JSON</div>
-                                    <div class="claim-raw-panel">
-                                        <pre>${colorizeJson(session.state)}</pre>
+                    <div class="claim-section">
+                        <div class="claim-section-header">Claim State</div>
+
+                        <!-- Always visible key details -->
+                        <div class="claim-key-details">
+                            ${renderKeyClaimDetails(session.state)}
+                        </div>
+
+                        <!-- Expandable additional details -->
+                        <div class="claim-accordion">
+                            <button class="claim-accordion-btn" onclick="toggleClaimBody('${sid}')">
+                                <span class="claim-accordion-label">Additional Details & Raw JSON</span>
+                                <svg class="claim-accordion-chevron" id="claim-icon-${sid}" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <div class="claim-accordion-body" id="claim-body-${sid}">
+                                <div class="claim-split">
+                                    <div>
+                                        <div class="claim-col-header">Additional Fields</div>
+                                        ${renderAdditionalClaimDetails(session.state)}
+                                    </div>
+                                    <div>
+                                        <div class="claim-col-header">Raw JSON</div>
+                                        <div class="claim-raw-panel">
+                                            <pre>${colorizeJson(session.state)}</pre>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1502,6 +1641,8 @@
             document.getElementById('detailView').classList.remove('active');
             document.getElementById('backBtn').classList.remove('visible');
             setSessionInUrl(null);
+            // Reset page title
+            document.querySelector('h1').textContent = 'Session Conversations';
         }
 
         async function init() {
