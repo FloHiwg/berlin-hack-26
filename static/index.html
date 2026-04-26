@@ -188,9 +188,14 @@
 
         .session-header {
             display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: var(--sp-3);
+            flex-direction: column;
+            gap: var(--sp-2);
+        }
+
+        .session-info {
+            display: flex;
+            flex-direction: column;
+            gap: var(--sp-1);
         }
 
         .session-id {
@@ -202,10 +207,17 @@
         }
 
         .session-date {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--on-surface);
+            font-family: var(--font-body);
+        }
+
+        .session-detail {
             font-size: 13px;
             font-weight: 400;
             color: var(--on-surface-variant);
-            margin-top: 4px;
+            font-family: var(--font-body);
         }
 
         .session-stage {
@@ -1161,24 +1173,21 @@
         }
 
         function renderSession(session) {
-            const artifacts = session.artifacts || {};
-            const stages = session.stages || [];
+            const state = session.state || {};
+            const customer = state.customer || {};
+
+            const policyNumber = customer.policy_number || 'N/A';
+            const customerName = customer.full_name || 'Unknown';
+            const createdDate = formatDate(session.created_at);
 
             return `
                 <div class="session-card" data-session-id="${session.session_id}">
                     <div class="session-header">
-                        <div>
-                            <div class="session-id">${session.session_id}</div>
-                            <div class="session-date">${formatDate(session.created_at)}</div>
-                            ${session.current_stage ? `<div style="margin-top: 8px;"><span class="session-stage">${session.current_stage}</span></div>` : ''}
-                            ${renderStages(stages)}
+                        <div class="session-info">
+                            <div class="session-date">${createdDate}</div>
+                            <div class="session-detail">Policy: ${escapeHtml(policyNumber)}</div>
+                            <div class="session-detail">Customer: ${escapeHtml(customerName)}</div>
                         </div>
-                    </div>
-                    <div class="artifacts">
-                        <span class="artifact ${artifacts.transcript ? 'available' : ''}">Transcript</span>
-                        <span class="artifact ${artifacts.audio ? 'available' : ''}">Audio</span>
-                        <span class="artifact ${artifacts.events ? 'available' : ''}">Events</span>
-                        <span class="artifact ${artifacts.claim ? 'available' : ''}">Claim</span>
                     </div>
                 </div>
             `;
