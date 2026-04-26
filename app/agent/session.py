@@ -21,8 +21,9 @@ from app.claims.claim_state import ClaimState
 from app.claims.playbook_engine import PlaybookEngine
 
 _MAX_RECONNECT_ATTEMPTS = 3
-_CLIENT_INTRO_PAUSE_SECONDS = 3
+_CLIENT_INTRO_PAUSE_SECONDS = 2
 _CLIENT_JINGLE_SOUND_SECONDS = 5
+_CLIENT_BEEP_SOUND_SECONDS = 2
 _CLIENT_PLAYBACK_SAMPLE_RATE = 24000
 _ROOT = Path(__file__).resolve().parents[2]
 _AUDIO_ASSETS_DIR = _ROOT / "app" / "audio" / "assets"
@@ -67,6 +68,7 @@ async def _play_intro_sequence() -> None:
 
     jingle_voice = _AUDIO_ASSETS_DIR / "jingle_voice.wav"
     jingle_sound = _AUDIO_ASSETS_DIR / "jingle_sound.wav"
+    beep_sound = _AUDIO_ASSETS_DIR / "beep.wav"
     if not jingle_voice.exists() or not jingle_sound.exists():
         print("[audio] intro assets missing; skipping intro sequence", flush=True)
         return
@@ -85,12 +87,13 @@ async def _play_intro_sequence() -> None:
             sound_audio = _load_wav_for_playback(jingle_sound, clip_seconds=_CLIENT_JINGLE_SOUND_SECONDS)
             if len(sound_audio) > 0:
                 await asyncio.to_thread(stream.write, sound_audio)
+
+            beep_audio = _load_wav_for_playback(beep_sound, clip_seconds=_CLIENT_BEEP_SOUND_SECONDS)
+            if len(beep_audio) > 0:
+                await asyncio.to_thread(stream.write, beep_audio)
         finally:
             stream.stop()
             stream.close()
-
-        print("[audio] intro sequence end (3s pause)", flush=True)
-        await asyncio.sleep(_CLIENT_INTRO_PAUSE_SECONDS)
     except Exception as exc:
         print(f"[audio] intro playback skipped: {exc}", flush=True)
 
