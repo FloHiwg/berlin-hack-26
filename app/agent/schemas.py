@@ -24,16 +24,25 @@ update_claim_state_tool = types.FunctionDeclaration(
 
 end_call_tool = types.FunctionDeclaration(
     name="end_call",
-    description="Call when the conversation should be ended, including urgent risk, injury, human handoff, misuse, or caller request to stop.",
+    description=(
+        "Call when the conversation should be terminated. "
+        "Lisa never transfers to a human agent; this only marks the session as ended. "
+        "Use after intake_completed, when an unsafe caller does not need assistance, "
+        "after a final warning for abusive callers, or when the caller asks to stop."
+    ),
     parameters=types.Schema(
         type=_schema_type("OBJECT"),
         properties={
             "reason": types.Schema(type=_schema_type("STRING")),
-            "risk_flags": types.Schema(
-                type=_schema_type("ARRAY"), items=types.Schema(type=_schema_type("STRING"))
+            "disposition": types.Schema(
+                type=_schema_type("STRING"),
+                description=(
+                    "Short call outcome label. Use one of: intake_completed, "
+                    "unsafe_callback, abuse_terminated, caller_requested_stop, other."
+                ),
             ),
         },
-        required=["reason", "risk_flags"],
+        required=["reason"],
     ),
 )
 

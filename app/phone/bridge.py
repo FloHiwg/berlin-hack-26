@@ -110,9 +110,13 @@ async def run_twilio_bridge(
             await asyncio.sleep(_PRE_GREETING_DELAY_SECONDS)
             await send_live_text(
                 session,
-                "Begin the claims intake now. Greet the customer and ask for the first required field.",
+                (
+                    "Begin the call now. Open with the EXACT scripted greeting from your "
+                    'system instructions ("Hello, this is Lisa from National Insurance '
+                    'emergency hotline. What happened?") and wait for the caller\'s response.'
+                ),
             )
-            logger.log("control", "greeting requested")
+            logger.log("control", "Lisa opening greeting requested")
 
             gemini_receive = asyncio.create_task(
                 _receive_voice_loop(

@@ -243,20 +243,23 @@ class FieldExtractor:
     """Side-channel extractor: uses a text model to pull claim fields from transcribed speech."""
 
     _PROMPT = """\
-Extract insurance claim fields from a customer's spoken response.
+Extract insurance claim fields from a caller's spoken response for the Lisa hotline agent.
 
 Already collected (skip these): {filled}
 
 Agent asked: "{agent_question}"
-Customer answered: "{utterance}"
+Caller answered: "{utterance}"
 
 Return a JSON object with dot-notation keys for any NEW fields clearly stated or implied by the answer in context.
-Valid keys: customer.full_name, customer.policy_number, customer.date_of_birth,
-customer.is_policyholder, customer.caller_name, customer.relationship_to_policyholder,
-claim_type, incident.date, incident.time, incident.location, incident.description,
+Valid keys: caller.is_policyholder, caller.full_name, caller.relationship_to_policyholder, caller.phone_number,
+policyholder.full_name, policyholder.date_of_birth, policyholder.policy_number, policyholder.alternate_identifier,
+claim_type, incident.date, incident.date_is_approximate, incident.time, incident.time_is_approximate,
+incident.location, incident.description, incident.road_type, incident.weather,
+driver.policyholder_was_driving, driver.license_valid, driver.listed_under_policy, driver.impairment_involved, driver.hit_and_run,
 damage.items, damage.description, damage.estimated_value, damage.photos_available,
 third_parties.involved, third_parties.details, third_parties.witness_info,
-safety.injuries, safety.urgent_risk, safety.police_report, safety.police_report_details,
+safety.is_safe_location, safety.needs_assistance, safety.emergency_services_dispatched,
+safety.injuries, safety.police_report, safety.police_report_details,
 services.rental_car_needed, services.rental_car_preference,
 services.repair_shop_selected, services.repair_shop_preference,
 documents.photos, documents.receipts
@@ -264,9 +267,12 @@ documents.photos, documents.receipts
 Rules:
 - Use the agent's question to interpret short answers like "Yes", "No", a number, or a name.
 - Only extract values that are clearly stated or directly implied. Never guess.
-- customer.is_policyholder: true if caller says they ARE the policyholder, false if calling on behalf.
+- caller.is_policyholder: true if caller says they ARE the policyholder, false if calling on someone else's behalf.
+- safety.is_safe_location: true if caller says they are safe / out of danger; false if they are not.
+- safety.needs_assistance: true if unsafe caller asks for or accepts help; false if they explicitly refuse.
 - claim_type must be one of: auto accident, property damage, theft, injury, weather damage.
 - damage.items must be a list of strings.
+- If the caller says they don't know a value, output that field with value "unknown".
 - Skip fields already present in "already collected".
 - Return {{}} if nothing new is extractable.
 - Return only valid JSON. No markdown fences, no explanation."""
@@ -544,11 +550,16 @@ async def _run_voice_session(
                     send_task = asyncio.create_task(send_audio(session, speaking_event, on_chunk=caller_recorder.add_chunk))
 
                     if attempt == 0:
-                        greeting = "Begin the claims intake now. Greet the customer and ask for the first required field."
+                        greeting = (
+                            "Begin the call now. Open with the EXACT scripted greeting "
+                            'from your system instructions ("Hello, this is Lisa from '
+                            'National Insurance emergency hotline. What happened?") '
+                            "and wait for the caller's response."
+                        )
                     else:
                         greeting = (
                             f"Reconnecting after session timeout. {claim_state.summary()}. "
-                            "Continue the intake from where we left off."
+                            "Resume the intake from the next missing field. Do NOT redeliver the opening line."
                         )
                     print("[audio] intro complete; requesting Gemini greeting", flush=True)
                     await send_live_text(session, greeting)
@@ -762,11 +773,15 @@ async def run_live_text_session(
     async with client.aio.live.connect(model=model, config=config) as live_session:
         await send_user_turn(
             live_session,
-            "Begin the claims intake now. Greet the customer and ask for the first required field.",
+            (
+                "Begin the call now. Open with the EXACT scripted greeting from your "
+                'system instructions ("Hello, this is Lisa from National Insurance '
+                'emergency hotline. What happened?") and wait for the caller\'s response.'
+            ),
         )
         logger.log(
             "control",
-            "Requested initial greeting and first claims intake question.",
+            "Requested Lisa opening greeting and first claims intake question.",
         )
         receive_task = asyncio.create_task(receive_loop(live_session, handlers, logger))
         send_task = asyncio.create_task(
@@ -809,7 +824,11 @@ async def run_generate_content_text_session(
         history,
         handlers,
         logger,
-        "Begin the claims intake now. Greet the customer and ask for the first required field.",
+        (
+            "Begin the call now. Open with the EXACT scripted greeting from your "
+            'system instructions ("Hello, this is Lisa from National Insurance '
+            'emergency hotline. What happened?") and wait for the caller\'s response.'
+        ),
         "control",
         playbook_engine,
         claim_state,

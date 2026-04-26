@@ -20,9 +20,7 @@ class PlaybookState:
 class PlaybookEngine:
     def __init__(self, states: dict[str, PlaybookState]) -> None:
         self.states = states
-        self.ordered_state_names = [
-            name for name in states if name not in {"escalate", "done"}
-        ]
+        self.ordered_state_names = [name for name in states if name != "done"]
 
     @classmethod
     def from_yaml(cls, path: Path) -> "PlaybookEngine":
@@ -46,9 +44,6 @@ class PlaybookEngine:
         return cls(states)
 
     def current_stage(self, claim_state: ClaimState) -> str:
-        if claim_state.handoff_required or claim_state.safety.urgent_risk is True:
-            return "escalate"
-
         stage_name = self.ordered_state_names[0]
         seen: set[str] = set()
         while stage_name not in seen:
@@ -68,7 +63,22 @@ class PlaybookEngine:
 
     @staticmethod
     def _eval_skip_if(claim_state: ClaimState, condition: str) -> bool:
-        """Evaluate a simple 'field.path == value' skip condition."""
+        """Evaluate a skip condition.
+
+        Supports a flat list of comparisons combined with `||` (OR) or `&&` (AND).
+        Mixing `||` and `&&` in the same condition is not supported.
+        """
+        condition = condition.strip()
+        if "||" in condition:
+            return any(
+                PlaybookEngine._eval_skip_if(claim_state, part)
+                for part in condition.split("||")
+            )
+        if "&&" in condition:
+            return all(
+                PlaybookEngine._eval_skip_if(claim_state, part)
+                for part in condition.split("&&")
+            )
         parts = condition.split(" == ", 1)
         if len(parts) != 2:
             return False
@@ -81,14 +91,19 @@ class PlaybookEngine:
 
     def get_missing_fields(self, claim_state: ClaimState) -> dict[str, str | None]:
         stage = self.current_stage(claim_state)
-        if stage in {"done", "escalate"}:
+        if stage == "done":
             return {}
         return self._missing_for_state(claim_state, self.states[stage])
 
     def all_required_fields(self) -> list[str]:
         fields: list[str] = []
+        seen: set[str] = set()
         for state_name in self.ordered_state_names:
-            fields.extend(self.states[state_name].required.keys())
+            for field in self.states[state_name].required.keys():
+                if field in seen:
+                    continue
+                seen.add(field)
+                fields.append(field)
         return fields
 
     def _missing_for_state(

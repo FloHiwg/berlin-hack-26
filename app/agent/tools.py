@@ -41,18 +41,15 @@ class ClaimToolHandlers:
             result["status"] = "updated_with_ignored_fields"
         return result
 
-    def end_call(self, reason: str, risk_flags: list[str] | None = None) -> dict[str, Any]:
-        risk_flags = risk_flags or []
-        if risk_flags:
-            self.claim_state.handoff_required = True
-        for flag in risk_flags:
-            if flag not in self.claim_state.risk_flags:
-                self.claim_state.risk_flags.append(flag)
+    def end_call(self, reason: str, disposition: str | None = None) -> dict[str, Any]:
+        if disposition:
+            self.claim_state.disposition = disposition
         self.claim_state.mark_completed()
         self.claim_state.save(self.storage_dir)
         print(
             "\nCALL ENDED."
-            f"\nReason: {reason}\n",
+            f"\nReason: {reason}"
+            f"\nDisposition: {disposition or 'unspecified'}\n",
             flush=True,
         )
         self.finished_reason = "ended"
@@ -79,13 +76,12 @@ class ClaimToolHandlers:
         if case_data is None:
             return format_case_response(None)
 
-        # Populate claim state with retrieved data
         case_update = {
             "claim_type": case_data.get("claim_type"),
             "status": case_data.get("status"),
-            "customer.full_name": case_data.get("claimant_full_name"),
-            "customer.policy_number": case_data.get("claimant_policy_number"),
-            "customer.date_of_birth": case_data.get("claimant_date_of_birth"),
+            "policyholder.full_name": case_data.get("claimant_full_name"),
+            "policyholder.policy_number": case_data.get("claimant_policy_number"),
+            "policyholder.date_of_birth": case_data.get("claimant_date_of_birth"),
             "incident.date": case_data.get("incident_date"),
             "incident.time": case_data.get("incident_time"),
             "incident.location": case_data.get("incident_location"),
@@ -134,7 +130,7 @@ class ClaimToolHandlers:
         if name == "end_call":
             return self.end_call(
                 reason=args.get("reason", "Call ended"),
-                risk_flags=list(args.get("risk_flags", [])),
+                disposition=args.get("disposition"),
             )
         if name == "finalize_claim":
             return self.finalize_claim()

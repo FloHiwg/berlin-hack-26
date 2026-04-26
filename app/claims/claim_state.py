@@ -12,22 +12,46 @@ def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-class Customer(BaseModel):
-    full_name: str | None = None
-    policy_number: str | None = None
-    date_of_birth: str | None = None
-    preferred_contact_method: str | None = None
-    identity_verified: bool | None = None
+METADATA_FIELDS: frozenset[str] = frozenset(
+    {"session_id", "created_at", "completed_at", "status", "disposition"}
+)
+
+
+class Caller(BaseModel):
+    """The person actually on the phone with Lisa."""
+
     is_policyholder: bool | None = None
-    caller_name: str | None = None
+    full_name: str | None = None
     relationship_to_policyholder: str | None = None
+    phone_number: str | None = None
+
+
+class Policyholder(BaseModel):
+    """The insured person whose policy the claim is filed against."""
+
+    full_name: str | None = None
+    date_of_birth: str | None = None
+    policy_number: str | None = None
+    alternate_identifier: str | None = None
 
 
 class Incident(BaseModel):
     date: str | None = None
+    date_is_approximate: bool | None = None
     time: str | None = None
+    time_is_approximate: bool | None = None
     location: str | None = None
     description: str | None = None
+    road_type: str | None = None
+    weather: str | None = None
+
+
+class Driver(BaseModel):
+    policyholder_was_driving: bool | None = None
+    license_valid: bool | None = None
+    listed_under_policy: bool | None = None
+    impairment_involved: bool | None = None
+    hit_and_run: bool | None = None
 
 
 class Damage(BaseModel):
@@ -58,10 +82,12 @@ class Services(BaseModel):
 
 
 class Safety(BaseModel):
+    is_safe_location: bool | None = None
+    needs_assistance: bool | None = None
+    emergency_services_dispatched: bool | None = None
     injuries: bool | str | None = None
     police_report: bool | None = None
     police_report_details: str | None = None
-    urgent_risk: bool | None = None
 
 
 class Documents(BaseModel):
@@ -76,15 +102,16 @@ class ClaimState(BaseModel):
     session_id: str
     claim_type: str | None = None
     status: str | None = None
-    customer: Customer = Field(default_factory=Customer)
+    disposition: str | None = None
+    caller: Caller = Field(default_factory=Caller)
+    policyholder: Policyholder = Field(default_factory=Policyholder)
     incident: Incident = Field(default_factory=Incident)
+    driver: Driver = Field(default_factory=Driver)
     damage: Damage = Field(default_factory=Damage)
     third_parties: ThirdParties = Field(default_factory=ThirdParties)
     safety: Safety = Field(default_factory=Safety)
     documents: Documents = Field(default_factory=Documents)
     services: Services = Field(default_factory=Services)
-    handoff_required: bool = False
-    risk_flags: list[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=utc_now_iso)
     completed_at: str | None = None
 
@@ -141,12 +168,10 @@ class ClaimState(BaseModel):
         )
         return path
 
-    _METADATA_FIELDS = {"session_id", "created_at", "completed_at", "handoff_required", "risk_flags"}
-
     def summary(self) -> str:
         filled = {
             k: v for k, v in self.filled_fields().items()
-            if k.split(".")[0] not in self._METADATA_FIELDS
+            if k.split(".")[0] not in METADATA_FIELDS
         }
         if not filled:
             return "No fields collected yet"

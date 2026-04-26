@@ -36,7 +36,7 @@ class _FakeVoiceSession:
                         name="finalize_claim" if self.receive_calls == 2 else "end_call",
                         args={}
                         if self.receive_calls == 2
-                        else {"reason": "Intake completed", "risk_flags": []},
+                        else {"reason": "Intake completed", "disposition": "intake_completed"},
                         id=f"call-{self.receive_calls - 1}",
                     )
                 ]

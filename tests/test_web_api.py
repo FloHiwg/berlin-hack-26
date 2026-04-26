@@ -11,21 +11,36 @@ def _write_session_files(storage_dir: Path, session_id: str) -> None:
     claim_payload = {
         "session_id": session_id,
         "claim_type": "auto accident",
-        "customer": {
-            "full_name": "Alex Rider",
-            "policy_number": "POL-123",
-            "date_of_birth": "1990-01-02",
-            "preferred_contact_method": None,
-            "identity_verified": True,
+        "status": None,
+        "disposition": None,
+        "caller": {
             "is_policyholder": True,
-            "caller_name": None,
+            "full_name": "Alex Rider",
             "relationship_to_policyholder": None,
+            "phone_number": None,
+        },
+        "policyholder": {
+            "full_name": "Alex Rider",
+            "date_of_birth": "1990-01-02",
+            "policy_number": "POL-123",
+            "alternate_identifier": None,
         },
         "incident": {
             "date": "2026-04-25",
+            "date_is_approximate": None,
             "time": None,
+            "time_is_approximate": None,
             "location": "Main Street",
-            "description": None,
+            "description": "Rear-end collision near the office.",
+            "road_type": None,
+            "weather": None,
+        },
+        "driver": {
+            "policyholder_was_driving": None,
+            "license_valid": None,
+            "listed_under_policy": None,
+            "impairment_involved": None,
+            "hit_and_run": None,
         },
         "damage": {
             "items": [],
@@ -35,10 +50,12 @@ def _write_session_files(storage_dir: Path, session_id: str) -> None:
         },
         "third_parties": {"involved": None, "details": None, "witness_info": None},
         "safety": {
+            "is_safe_location": True,
+            "needs_assistance": None,
+            "emergency_services_dispatched": None,
             "injuries": None,
             "police_report": None,
             "police_report_details": None,
-            "urgent_risk": False,
         },
         "documents": {"photos": None, "receipts": None, "police_report": None},
         "services": {
@@ -47,8 +64,6 @@ def _write_session_files(storage_dir: Path, session_id: str) -> None:
             "repair_shop_selected": None,
             "repair_shop_preference": None,
         },
-        "handoff_required": False,
-        "risk_flags": [],
         "created_at": "2026-04-25T17:00:00+00:00",
         "completed_at": None,
     }
@@ -87,7 +102,7 @@ def test_list_and_get_session(monkeypatch, tmp_path: Path) -> None:
         assert list_response.status_code == 200
         payload = list_response.json()
         assert payload["sessions"][0]["session_id"] == session_id
-        assert payload["sessions"][0]["current_stage"] == "collect_incident"
+        assert payload["sessions"][0]["current_stage"] == "incident_details"
         assert payload["sessions"][0]["artifacts"]["audio"] is True
 
         detail_response = client.get(f"/api/sessions/{session_id}")
