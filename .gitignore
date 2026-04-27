@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 .idea/
 storage/sessions/
+new_design/node_modules/
