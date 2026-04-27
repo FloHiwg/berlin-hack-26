@@ -38,29 +38,21 @@
         body { font-family: var(--font-body); background: var(--surface); color: var(--on-surface); position: relative; }
 
         /* Animated background */
-        .bg-canvas { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-        .bg-gradient {
-            position: absolute; inset: 0;
-            background: linear-gradient(135deg, #faf9f5 0%, #e9e8e4 25%, #f5f4f0 50%, #dde4b2 75%, #faf9f5 100%);
-            background-size: 400% 400%;
-            animation: gradientShift 20s linear infinite;
+        .bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+        .bg-canvas::before, .bg-canvas::after { content: ''; position: absolute; inset: 0; }
+        .bg-canvas::before {
+            background:
+                radial-gradient(ellipse 60% 50% at 15% 50%, rgba(181, 211, 50, 0.18) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 60% at 85% 25%, rgba(154, 181, 10, 0.12) 0%, transparent 70%),
+                linear-gradient(160deg, #faf9f5 0%, #f0efe9 40%, #e6ecc8 70%, #eff0e8 100%);
+            background-size: 200% 200%, 200% 200%, 100% 100%;
+            animation: bgShift 25s ease-in-out infinite;
         }
-        .bg-orb-1 {
-            position: absolute; inset: 0;
-            background: radial-gradient(circle at 20% 50%, rgba(181, 211, 50, 0.15) 0%, transparent 50%);
-            animation: orbFloat1 15s ease-in-out infinite;
+        @keyframes bgShift {
+            0%   { background-position: 0% 50%,   100% 0%,   0% 0%; }
+            50%  { background-position: 100% 50%,  0% 100%,  0% 0%; }
+            100% { background-position: 0% 50%,   100% 0%,   0% 0%; }
         }
-        .bg-orb-2 {
-            position: absolute; inset: 0;
-            background: radial-gradient(circle at 80% 30%, rgba(154, 181, 10, 0.10) 0%, transparent 50%);
-            animation: orbFloat2 18s ease-in-out infinite;
-        }
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 0%; }
-            50%       { background-position: 100% 100%; }
-        }
-        @keyframes orbFloat1 { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(100px,50px); } }
-        @keyframes orbFloat2 { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(-100px,100px); } }
 
         /* Layout */
         .container { max-width: 1400px; margin: 0 auto; padding: 32px; position: relative; z-index: 1; }
@@ -215,11 +207,7 @@
     </style>
 </head>
 <body>
-    <div class="bg-canvas">
-        <div class="bg-gradient"></div>
-        <div class="bg-orb-1"></div>
-        <div class="bg-orb-2"></div>
-    </div>
+    <div class="bg-canvas"></div>
 
     <div class="container">
         <div class="header">
