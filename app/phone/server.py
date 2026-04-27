@@ -58,10 +58,6 @@ static_dir = ROOT / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Serve Vite build assets (built to static/assets/)
-assets_dir = static_dir / "assets"
-if assets_dir.exists():
-    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="static-assets")
 
 
 def _session_file_paths(storage_dir: Path, session_id: str) -> dict[str, Path]:
@@ -161,15 +157,6 @@ def _validate_env() -> None:
 @app.get("/")
 async def root() -> FileResponse:
     """Serve the web UI."""
-    index_path = ROOT / "static" / "index.html"
-    if not index_path.exists():
-        raise HTTPException(status_code=404, detail="Web UI not found")
-    return FileResponse(index_path)
-
-
-@app.get("/conversation/{session_id}")
-async def conversation_detail_spa(session_id: str) -> FileResponse:
-    """Serve the SPA for the conversation detail route."""
     index_path = ROOT / "static" / "index.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="Web UI not found")
