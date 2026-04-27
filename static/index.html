@@ -120,11 +120,6 @@
 
         .session-card-row1 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
         .session-card-name { font-size: 14px; font-weight: 600; letter-spacing: 0.04em; color: var(--on-surface); }
-        .badge { display: inline-block; padding: 3px 10px; border-radius: var(--r-pill); font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
-        .badge-resolved  { background: var(--primary-container);  color: var(--on-primary-container); }
-        .badge-progress  { background: var(--error-container);    color: var(--on-error-container); }
-        .badge-pending   { background: var(--secondary-container);color: var(--on-secondary-container); }
-        .badge-audio     { background: var(--secondary-container);color: var(--on-secondary-container); }
 
         .session-card-summary { font-size: 14px; line-height: 1.5; color: var(--on-surface-variant); margin-bottom: 10px; }
         .session-card-meta { display: flex; align-items: center; gap: 16px; }
@@ -286,6 +281,15 @@
             return 'pending';
         }
 
+        function fmtDuration(start, end) {
+            if (!start || !end) return null;
+            const secs = Math.round((new Date(end) - new Date(start)) / 1000);
+            if (secs < 0) return null;
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
+
         function fmtDate(iso) {
             if (!iso) return '—';
             return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -313,15 +317,12 @@
             const summary  = raw ? (raw.length > 90 ? raw.slice(0, 90) + '…' : raw)
                            : incident.location ? `Incident at ${esc(incident.location)}`
                            : `Stage: ${s.current_stage || 'intake'}`;
-            const st = deriveStatus(s);
-            const stLabels = { resolved: 'Resolved', progress: 'In Progress', pending: 'Pending' };
+            const duration = fmtDuration(s.created_at, s.completed_at);
 
             return `
                 <div class="session-card glass glass-item" data-id="${esc(s.session_id)}">
                     <div class="session-card-row1">
                         <span class="session-card-name">${esc(name)}</span>
-                        <span class="badge badge-${st}">${stLabels[st]}</span>
-                        ${s.artifacts?.audio ? '<span class="badge badge-audio">Audio</span>' : ''}
                     </div>
                     <div class="session-card-summary">${esc(summary)}</div>
                     <div class="session-card-meta">
@@ -333,6 +334,10 @@
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                             ${fmtTime(s.created_at)}
                         </div>
+                        ${duration ? `<div class="session-card-meta-item">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                            ${duration}
+                        </div>` : ''}
                         <span class="session-card-id">${esc(s.session_id)}</span>
                     </div>
                 </div>`;
