@@ -309,7 +309,12 @@ def build_system_prompt(
         if caller_phone
         else ""
     )
-    context_block = "\n".join(filter(None, [date_time_line, caller_line]))
+    customer_profile_line = ""
+    if claim_state.policyholder.customer_profile.membership_since:
+        customer_profile_line = (
+            f"Customer profile: Member since {claim_state.policyholder.customer_profile.membership_since}"
+        )
+    context_block = "\n".join(filter(None, [date_time_line, caller_line, customer_profile_line]))
 
     return f"""You are {AGENT_NAME}, a professional emergency hotline agent for {COMPANY_NAME}. Be calm, clear, empathetic when needed, and efficient.
 

@@ -26,6 +26,13 @@ class Caller(BaseModel):
     phone_number: str | None = None
 
 
+class CustomerProfile(BaseModel):
+    """Customer profile information fetched when policy number is identified."""
+
+    membership_since: str | None = None  # ISO date format
+    # Future extensibility: tier, total_claims, etc.
+
+
 class Policyholder(BaseModel):
     """The insured person whose policy the claim is filed against."""
 
@@ -33,6 +40,7 @@ class Policyholder(BaseModel):
     date_of_birth: str | None = None
     policy_number: str | None = None
     alternate_identifier: str | None = None
+    customer_profile: CustomerProfile = Field(default_factory=CustomerProfile)
 
 
 class Incident(BaseModel):
