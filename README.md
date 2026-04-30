@@ -84,8 +84,8 @@ Incoming call (Twilio)
 
 ## Team
 
-- Mattheu Classen
-- Florian Gutendorf Heiwig
+- Matthieu Classen (https://www.linkedin.com/in/matthieuclassen/)
+- Florian Gutendorf Heiwig (https://www.linkedin.com/in/florian-heiwig)
 
 ---
 
